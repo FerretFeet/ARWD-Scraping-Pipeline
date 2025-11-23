@@ -9,7 +9,6 @@ from src.data_pipeline.extract import WebCrawler
 from src.data_pipeline.extract.WebCrawler import Crawler
 from src.data_pipeline.extract.selector_templates.ArStateLegislatorSelector import ArStateLegislatorSelector
 
-from test.conftest import LEGISLATOR_FIXTURE_PARAMS
 
 
 @pytest.fixture(scope="session")

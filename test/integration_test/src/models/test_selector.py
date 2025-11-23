@@ -1,17 +1,8 @@
 from src.data_pipeline.extract.WebCrawler import Crawler
-from src.data_pipeline.extract.selector_templates.ArStateLegislatorSelector import ArStateLegislatorSelector
-from test.conftest import LEGISLATOR_FIXTURE_PARAMS
 
-SELECTOR_TESTS = [
-    {
-        "selector_class": ArStateLegislatorSelector,
-        "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
-        "required_keys": ["title", "district", "seniority"],
-    },
-
-    # Add other selectors here...
-]
 import pytest
+
+from test.selector_config import SELECTOR_TESTS
 
 # Flatten selector + fixture param combinations
 param_list = []
@@ -46,12 +37,12 @@ def test_selector_success_all(selector_info, html_selector_fixture):
     for key in keys:
         assert key in result.keys()
         if key in required_keys:
-            assert result[key] is not None
-            assert isinstance(result[key], list)
+            assert result[key] is not None, f'required key {key} is missing'
+            assert isinstance(result[key], list), f'expected list for key {key}, got {type(result[key])}'
         elif key == "rel_url":
-            assert isinstance(result[key], str)
+            assert isinstance(result[key], str), f'expected str for key {key}, got {type(result[key])}'
         else:
-            assert result[key] is None or isinstance(result[key], list)
+            assert result[key] is None or isinstance(result[key], list), f'expected list or none for key {key}, got {type(result[key])}'
 
     if "committees" in result and "committee_links" in result:
-        assert len(result["committees"]) == len(result["committee_links"])
+        assert len(result["committees"]) == len(result["committee_links"]), f'Length mismatch between committees and committee_links'
