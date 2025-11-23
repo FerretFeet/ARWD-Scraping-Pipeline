@@ -214,7 +214,7 @@ class TestGetContent:
         result = Crawler.get_content(website, path)
 
         # This now works because we return a ScrapeResult object
-        assert result['page_rel_url'] == path
+        assert result['rel_url'] == path
         # Depending on how create_real_soup is set up, ensure these assertions match
         assert result['titleTag'] == ["Page Title Text"]
 
@@ -260,7 +260,7 @@ class TestGetContent:
 
         mock_get_page.return_value = create_mock_soup()
         result = Crawler.get_content(website, 'false_path')
-        assert result['page_rel_url'] == 'false_path'
+        assert result['rel_url'] == 'false_path'
         assert result['badSelector'] is None
         assert result['badSelectorTuple'] is None
 

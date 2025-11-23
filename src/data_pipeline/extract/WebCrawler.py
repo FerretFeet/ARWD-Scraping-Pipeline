@@ -125,7 +125,7 @@ class Crawler:
                     args = [selector] if attr is None else [selector, attr]
                     content_holder[key] = Crawler.safe_get(soup, *args)
 
-        content_holder['page_rel_url'] = path
+        content_holder['rel_url'] = path
         session.close() if session_flag else None
         logger.info(f'\nCrawler executed and retrieved content')
         return content_holder
