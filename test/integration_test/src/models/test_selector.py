@@ -39,6 +39,7 @@ def test_selector_success_all(selector_info, html_selector_fixture):
         if key in required_keys:
             assert result[key] is not None, f'required key {key} is missing'
             assert isinstance(result[key], list), f'expected list for key {key}, got {type(result[key])}'
+            assert len(result[key]) > 0, f'length of list for key {key} is zero'
         elif key == "rel_url":
             assert isinstance(result[key], str), f'expected str for key {key}, got {type(result[key])}'
         else:
