@@ -7,7 +7,7 @@ from src.utils.logger import logger
 
 
 
-class ArStateLegislatorSelector(SelectorTemplate):
+class LegislatorSelector(SelectorTemplate):
 
     def __init__(self, url: str):
         super().__init__(

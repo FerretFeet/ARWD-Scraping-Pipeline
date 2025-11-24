@@ -7,14 +7,14 @@ from bs4 import BeautifulSoup
 
 from src.data_pipeline.extract import WebCrawler
 from src.data_pipeline.extract.WebCrawler import Crawler
-from src.data_pipeline.extract.selector_templates.ArStateLegislatorSelector import ArStateLegislatorSelector
+from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import LegislatorSelector
 
 
 
 @pytest.fixture(scope="session")
 def known_legislator_soup_fixture() -> BeautifulSoup:
     """Load saved HTML fixture for legislators page."""
-    fixture_path = Path(__file__).parent.parent.parent.parent.parent.parent / "fixtures" / "html" / "legislator" / "legislator.known.html"
+    fixture_path = Path(__file__).parent.parent.parent.parent.parent.parent.parent / "fixtures" / "html" / "legislator" / "legislator.known.html"
     with fixture_path.open(encoding="utf-8") as f:
         html = f.read()
         return BeautifulSoup(html, 'html.parser')
@@ -24,7 +24,7 @@ class TestArStateLegislatorSelector:
 
     @patch.object(WebCrawler.Crawler, 'get_page')
     def test_known_legislator_expected_return(self, mock_get_page, known_legislator_soup_fixture):
-        selector = ArStateLegislatorSelector("/stem/")
+        selector = LegislatorSelector("/stem/")
         crawler = Crawler("")
         rel_url = '/return/path'
         mock_get_page.return_value = known_legislator_soup_fixture
