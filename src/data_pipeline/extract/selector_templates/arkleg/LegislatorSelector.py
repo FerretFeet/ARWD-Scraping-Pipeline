@@ -33,7 +33,7 @@ class _LegislatorParsers:
         table = soup.find('div', attrs={'id': 'tableDataWrapper'})
         if not table:
             logger.warning('table not found')
-            return result
+            return None
         label_tags = table.select('div.row div.d-lg-block b')
         label_tag = ''
         for tag in label_tags:
@@ -41,16 +41,15 @@ class _LegislatorParsers:
                 label_tag = tag
                 break
 
-        # label_tag = next((b for b in label_tags if label.match(b.get_text(strip=True))), None)
         if not label_tag or label_tag == '':
             logger.warning('label tag not found')
-            return result
+            return None
         target_parent = label_tag.parent
-        if not target_parent: return result
+        if not target_parent: return None
         target = target_parent.find_next_sibling()
         if not target:
             logger.warning('target not found')
-            return result
+            return None
         result.append(target.get_text().strip())
         return result
 

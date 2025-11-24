@@ -7,9 +7,12 @@ Inputs:
 - required_keys (list of required successful selector attributes)
 """
 from src.data_pipeline.extract.selector_templates.arkleg.BillCategorySelector import BillCategorySelector
+from src.data_pipeline.extract.selector_templates.arkleg.BillListSelector import BillListSelector
+from src.data_pipeline.extract.selector_templates.arkleg.BillSelector import BillSelector
 from src.data_pipeline.extract.selector_templates.arkleg.LegislatorListSelector import LegislatorListSelector
 from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import LegislatorSelector
-from test.fixture_params import LEGISLATOR_FIXTURE_PARAMS, LEGISLATOR_LIST_PARAMS, BILL_CATEGORY_FIXTURE_PARAMS
+from test.fixture_params import LEGISLATOR_FIXTURE_PARAMS, LEGISLATOR_LIST_PARAMS, BILL_CATEGORY_FIXTURE_PARAMS, \
+    BILL_LIST_FIXTURE_PARAMS, BILL_FIXTURE_PARAMS
 
 SELECTOR_TESTS = [
     {
@@ -26,7 +29,24 @@ SELECTOR_TESTS = [
         "selector_class": BillCategorySelector,
         "fixture_params": BILL_CATEGORY_FIXTURE_PARAMS,
         "required_keys": ["bill_cat_link"],
-    }
+    },
+    {
+        "selector_class": BillListSelector,
+        "fixture_params": BILL_LIST_FIXTURE_PARAMS,
+        "required_keys": ["chamber", 'session', 'bill_url'],
+    },
+    {
+        "selector_class": BillSelector,
+        "fixture_params": BILL_FIXTURE_PARAMS,
+        "required_keys": ["title",
+                          'bill_no',
+                          'bill_no_dwnld',
+                          'orig_chamber',
+                          'lead_sponsor',
+                          'lead_sponsor_link',
+                          'intro_date'
+                          ],
+    },
 
 
     # Add other selectors here...

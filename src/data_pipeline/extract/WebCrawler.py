@@ -61,7 +61,6 @@ class Crawler:
             if Crawler.strict:
                 raise ValueError(f'Selector "{selector}" returned nothing')
             return None
-        if not selected_elems: return None
         values: List[str] = []
         for elem in selected_elems:
             if attr == 'text':
@@ -99,12 +98,11 @@ class Crawler:
         if soup:
             for key, val in website.selectors.items():
                 if callable(val):
-                    # --- STRATEGY 1: Rule is a complex function ---
-                    # We pass the function the tools it needs.
-                    # It must handle its own errors and return the data.
-                    # Data should be returned as a list of str or None
+                    # If selector is a helper function
                     try:
                         data = val(soup)
+                        if not isinstance(data, list):
+                            data = [data]
                         content_holder[key] = data
                     except Exception as e:
                         logger.warning(f"Error running custom parser for '{key}': {e}")
