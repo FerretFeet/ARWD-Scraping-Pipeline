@@ -26,7 +26,7 @@ BILL_LIST_FIXTURE_PARAMS = [
     ("bill_list_page/bill_list", "https://www.arkleg.state.ar.us/Bills/ViewBills?&type=HB&ddBienniumSession=2003%2FR","v3")
 ]
 
-VOTE_PAGE_PARAMS = [
+VOTE_PAGE_FIXTURE_PARAMS = [
     ("vote_page/vote", "https://arkleg.state.ar.us/Bills/Votes?id=HB1002&rcs=108&chamber=House&ddBienniumSession=2013%2F2013R", 'v1'),
     ("vote_page/vote", "https://arkleg.state.ar.us/Bills/Votes?id=HB1002&rcs=254&chamber=Senate&ddBienniumSession=2013%2F2013R", "v2"),
     ("vote_page/vote", "https://arkleg.state.ar.us/Bills/Votes?id=HB1002&rcs=650&chamber=House&ddBienniumSession=2017%2F2017R", "v3"),

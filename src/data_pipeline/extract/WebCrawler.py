@@ -101,7 +101,7 @@ class Crawler:
                     # If selector is a helper function
                     try:
                         data = val(soup)
-                        if not isinstance(data, list):
+                        if not isinstance(data, list) and data is not None:
                             data = [data]
                         content_holder[key] = data
                     except Exception as e:

@@ -9,10 +9,11 @@ Inputs:
 from src.data_pipeline.extract.selector_templates.arkleg.BillCategorySelector import BillCategorySelector
 from src.data_pipeline.extract.selector_templates.arkleg.BillListSelector import BillListSelector
 from src.data_pipeline.extract.selector_templates.arkleg.BillSelector import BillSelector
+from src.data_pipeline.extract.selector_templates.arkleg.BillVoteSelector import BillVoteSelector
 from src.data_pipeline.extract.selector_templates.arkleg.LegislatorListSelector import LegislatorListSelector
 from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import LegislatorSelector
 from test.fixture_params import LEGISLATOR_FIXTURE_PARAMS, LEGISLATOR_LIST_PARAMS, BILL_CATEGORY_FIXTURE_PARAMS, \
-    BILL_LIST_FIXTURE_PARAMS, BILL_FIXTURE_PARAMS
+    BILL_LIST_FIXTURE_PARAMS, BILL_FIXTURE_PARAMS, VOTE_PAGE_FIXTURE_PARAMS
 
 SELECTOR_TESTS = [
     {
@@ -47,7 +48,11 @@ SELECTOR_TESTS = [
                           'intro_date'
                           ],
     },
-
+    {
+        "selector_class": BillVoteSelector,
+        "fixture_params": VOTE_PAGE_FIXTURE_PARAMS,
+        "required_keys": ['title'],
+    },
 
     # Add other selectors here...
 ]

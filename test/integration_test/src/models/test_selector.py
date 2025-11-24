@@ -45,5 +45,17 @@ def test_selector_success_all(selector_info, html_selector_fixture):
         else:
             assert result[key] is None or isinstance(result[key], list), f'expected list or none for key {key}, got {type(result[key])}'
 
-    if "committees" in result and "committee_links" in result:
-        assert len(result["committees"]) == len(result["committee_links"]), f'Length mismatch between committees and committee_links'
+    for names_key, links_key in [
+        ("yea_names", "yea_links"),
+        ("nay_names", "nay_links"),
+        ("non_voting_names", "non_voting_links"),
+        ("present_names", "present_links"),
+        ("excused_names", "excused_links"),
+        ("committees", "committee_links"),
+    ]:
+        if names_key in result and links_key in result:
+            if isinstance(result[names_key], list) and isinstance(result[links_key], list):
+                assert len(result[names_key]) == len(result[links_key]), (
+                    f"Length mismatch: {names_key} ({len(result[names_key])}) "
+                    f"vs {links_key} ({len(result[links_key])})"
+                )
