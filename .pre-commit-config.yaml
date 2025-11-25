@@ -11,3 +11,9 @@ repos:
     hooks:
       - id: ruff-check
         args: [ "--fix" ]  # auto-fixable issues; remove if you don't want auto-fixes
+  # Bandit for code security
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.2
+    hooks:
+      - id: bandit
+        args: [ "-c", "pyproject.toml", "-r" ]
