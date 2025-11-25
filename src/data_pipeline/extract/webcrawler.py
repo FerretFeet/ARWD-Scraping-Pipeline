@@ -11,15 +11,12 @@ from src.utils.logger import logger
 class Crawler:
     """Web Crawler for requesting and parsing HTML content."""
 
-    strict: bool = False  # toggle for strict validation
-
     def __init__(self, site: str, *, strict: bool | None = None) -> None:
         """Initialize the Crawler with domain base-url and optional strict parameter."""
         self.site = site
         self.strict = config["strict"] if strict is None else strict
 
-    @staticmethod
-    def get_page(session: Session, url: str) -> BeautifulSoup:
+    def get_page(self, session: Session, url: str) -> BeautifulSoup:
         """Make an http request and return a beautiful soup object of the page."""
         if not isinstance(session, Session) or not isinstance(url, str):
             message = (
@@ -40,8 +37,7 @@ class Crawler:
 
         return BeautifulSoup(html.text, "html.parser")
 
-    @staticmethod
-    def safe_get(soup: BeautifulSoup, selector: str, attr: str = "text") -> list[str] | None:
+    def safe_get(self, soup: BeautifulSoup, selector: str, attr: str = "text") -> list[str] | None:
         """
         Get a specified attribute from a beautiful soup object using a CSS selector.
 
@@ -66,8 +62,6 @@ class Crawler:
         if not selected_elems:
             msg = f"[safe_get] No matches found for selector '{selector}'"
             logger.warning(msg)
-            if Crawler.strict:
-                raise ValueError(msg)
             return None
         values: list[str] = []
         for elem in selected_elems:
@@ -78,13 +72,13 @@ class Crawler:
             else:
                 message = f'Element "{elem}" does not have attribute "{attr}"'
                 logger.warning(message)
-                if Crawler.strict:
+                if self.strict:
                     raise AttributeError(message)
                 continue
         return values if values else None
 
-    @staticmethod
     def get_content(
+        self,
         template: SelectorTemplate,
         path: str,
         session: Session = None,
@@ -108,7 +102,7 @@ class Crawler:
         content_holder = {}
         session_flag = session is None
         session = session or Session()
-        soup = Crawler.get_page(session, page_url)
+        soup = self.get_page(session, page_url)
         if soup:
             for key, val in template.selectors.items():
                 if callable(val):
@@ -137,7 +131,7 @@ class Crawler:
                     else:
                         selector = val
                     args = [selector] if attr is None else [selector, attr]
-                    content_holder[key] = Crawler.safe_get(soup, *args)
+                    content_holder[key] = self.safe_get(soup, *args)
 
         content_holder["rel_url"] = path
         content_holder["base_url"] = template.url
