@@ -1,6 +1,7 @@
 from typing import List
+
 from bs4 import BeautifulSoup
-from requests import Session, RequestException
+from requests import RequestException, Session
 
 from src.config.settings import config
 from src.models.SelectorTemplate import SelectorTemplate
@@ -128,6 +129,6 @@ class Crawler:
         content_holder['rel_url'] = path
         content_holder['base_url'] = template.url
         session.close() if session_flag else None
-        logger.info(f'\nCrawler executed and retrieved content')
+        logger.info('\nCrawler executed and retrieved content')
         return content_holder
 

@@ -2,6 +2,7 @@
 from src.config.settings import config
 from src.utils.logger import logger
 
+
 class PipelineTransformer:
     strict: bool = False
 

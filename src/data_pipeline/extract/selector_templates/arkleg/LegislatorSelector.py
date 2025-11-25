@@ -6,7 +6,6 @@ from src.models.SelectorTemplate import SelectorTemplate
 from src.utils.logger import logger
 
 
-
 class LegislatorSelector(SelectorTemplate):
 
     def __init__(self, url: str):

@@ -4,7 +4,9 @@ import pytest
 from bs4 import BeautifulSoup
 
 from src.data_pipeline.extract import WebCrawler
-from src.data_pipeline.extract.selector_templates.arkleg.BillVoteSelector import BillVoteSelector
+from src.data_pipeline.extract.selector_templates.arkleg.BillVoteSelector import (
+    BillVoteSelector,
+)
 from src.utils.paths import project_root
 
 

@@ -18,7 +18,6 @@ def test_selector_success_all(pipeline_info, html_selector_fixture):
     """
     Generalized test for all selectors.
     """
-    soup = html_selector_fixture["soup"]
     filename = html_selector_fixture["filename"]
 
     selector_class = pipeline_info["selector_class"]
@@ -32,6 +31,8 @@ def test_selector_success_all(pipeline_info, html_selector_fixture):
 
     keys = ["rel_url"]
     keys.extend(str(key) for key in selector.selectors.keys())
+    for key in required_keys:
+        assert result[key] is not None
 
     try:
         transformer_class = pipeline_info["transformer_class"]

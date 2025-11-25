@@ -1,16 +1,11 @@
-from unittest import mock
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import requests
-from pathlib import Path
-
 from bs4 import BeautifulSoup
 
 from src.data_pipeline.extract.WebCrawler import Crawler
-
-
-
 
 
 def pytest_addoption(parser):

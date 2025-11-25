@@ -1,4 +1,5 @@
 from unittest.mock import Mock
+
 from requests import Session
 
 from src.data_pipeline.extract.extract_parse_content import extract_parse_content

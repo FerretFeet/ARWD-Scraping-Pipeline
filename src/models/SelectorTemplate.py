@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Callable, Tuple, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from bs4 import BeautifulSoup
 

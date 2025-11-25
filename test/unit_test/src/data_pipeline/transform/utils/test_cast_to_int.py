@@ -3,7 +3,6 @@ import pytest
 from src.data_pipeline.transform.utils.cast_to_int import cast_to_int
 
 
-
 class TestCastToInt:
 
     @pytest.mark.parametrize('input_str, output_num',

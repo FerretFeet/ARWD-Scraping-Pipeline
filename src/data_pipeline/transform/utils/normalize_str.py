@@ -20,7 +20,7 @@ def normalize_str(string: str, strict:bool = False) -> str | None:
         string = normalize_space(string)
         # Convert to lowercase
         return string.lower()
-    except Exception as e:
+    except Exception:
         msg = f'Unable to normalize string: {string}'
         logger.warning(msg)
         if strict:

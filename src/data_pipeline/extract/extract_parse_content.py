@@ -1,6 +1,6 @@
 """Function for extracting and parsing web page content using selector templates."""
 import time
-from typing import List, Dict
+from typing import Dict, List
 
 from requests import Session
 

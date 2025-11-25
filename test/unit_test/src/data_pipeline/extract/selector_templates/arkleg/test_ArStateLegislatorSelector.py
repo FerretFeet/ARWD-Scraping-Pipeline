@@ -1,12 +1,13 @@
 import re
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
 
 from src.data_pipeline.extract import WebCrawler
-from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import LegislatorSelector
+from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import (
+    LegislatorSelector,
+)
 from src.utils.paths import project_root
 
 

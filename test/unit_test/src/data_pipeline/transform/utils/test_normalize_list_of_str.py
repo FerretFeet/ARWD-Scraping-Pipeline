@@ -1,6 +1,8 @@
 import pytest
 
-from src.data_pipeline.transform.utils.normalize_list_of_str import normalize_list_of_str
+from src.data_pipeline.transform.utils.normalize_list_of_str import (
+    normalize_list_of_str,
+)
 
 
 class TestNormalizeListOfStr:

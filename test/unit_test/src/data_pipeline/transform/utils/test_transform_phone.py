@@ -43,7 +43,7 @@ class TestNormalizePhone:
         ])
     def test_normalize_phone_strict_raises_error(self, input_string: str, expected_output: str):
         with pytest.raises(Exception):
-            result = transform_phone(input_string, strict=True)
+            transform_phone(input_string, strict=True)
 
     @pytest.mark.parametrize(
         "input_string, expected_output",

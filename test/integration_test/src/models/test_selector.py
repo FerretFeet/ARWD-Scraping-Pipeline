@@ -1,7 +1,6 @@
-from src.data_pipeline.extract.WebCrawler import Crawler
-
 import pytest
 
+from src.data_pipeline.extract.WebCrawler import Crawler
 from test.selector_config import SELECTOR_TESTS
 
 # Flatten selector + fixture param combinations
@@ -19,7 +18,6 @@ def test_selector_success_all(selector_info, html_selector_fixture):
     """
     Generalized test for all selectors.
     """
-    soup = html_selector_fixture["soup"]
     filename = html_selector_fixture["filename"]
 
     selector_class = selector_info["selector_class"]

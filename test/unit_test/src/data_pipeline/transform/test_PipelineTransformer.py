@@ -21,7 +21,7 @@ class TestTransformContent:
 
 
     @pytest.mark.parametrize("bad_transformer", [{'text': 'invalid_selector_type'},
-                                                 {'text': lambda val: {f'incorrect return type'}},
+                                                 {'text': lambda val: {'incorrect return type'}},
                                                  {'bad_key': lambda val: {val.lower()}}
     ])
     def test_transform_content_raises_exception_when_strict(self, bad_transformer):

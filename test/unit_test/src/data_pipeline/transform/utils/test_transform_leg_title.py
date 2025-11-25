@@ -1,6 +1,9 @@
 import pytest
 
-from src.data_pipeline.transform.utils.transform_leg_title import transform_leg_title, _parse_name
+from src.data_pipeline.transform.utils.transform_leg_title import (
+    _parse_name,
+    transform_leg_title,
+)
 
 
 class TestTransformTitles:
