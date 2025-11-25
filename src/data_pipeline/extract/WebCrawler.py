@@ -1,3 +1,5 @@
+"""Web Crawler for requesting and parsing HTML content."""
+
 from typing import List
 
 from bs4 import BeautifulSoup
@@ -9,18 +11,19 @@ from src.utils.logger import logger
 
 
 class Crawler:
+    """Web Crawler for requesting and parsing HTML content."""
+
     strict: bool = False  # toggle for strict validation
 
     def __init__(self, site: str, strict: bool | None = None):
+        """Initialize the Crawler with domain base-url and optional strict parameter."""
         self.site = site
         self.strict = config["strict"] if strict is None else strict
         # self.session = Session()
 
     @staticmethod
     def get_page(session: Session, url: str) -> BeautifulSoup:
-        """
-        Make an http request and return a beautiful soup object of the page
-        """
+        """Make an http request and return a beautiful soup object of the page."""
         if not isinstance(session, Session) or not isinstance(url, str):
             message = (
                 f"Parameter inserted of incorrect type. \n"
@@ -48,7 +51,8 @@ class Crawler:
     @staticmethod
     def safe_get(soup: BeautifulSoup, selector: str, attr: str = "text") -> List[str] | None:
         """
-        Utility Function to get a specified attribute from a beautiful soup object.
+        Get a specified attribute from a beautiful soup object using a CSS selector.
+
         Selects text attribute of element by default
         Returns None on failure or a List of Strings on success
         """
@@ -88,7 +92,9 @@ class Crawler:
     @staticmethod
     def get_content(template: SelectorTemplate, path: str, session=None):
         """
-        The 'website.selectors' dict can contain:
+        Request a page and return the parsed content.
+
+        The 'template.selectors' dict can contain:
         - key: (selector, attr, label) -> For simple, declarative scraping
         - key: callable_function(soup)      -> For complex, imperative scraping
         """

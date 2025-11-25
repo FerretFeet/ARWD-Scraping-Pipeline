@@ -1,4 +1,8 @@
+"""main.py."""
+
+
 def main():
+    """Run the main function."""
     print("Hello from pythonproject!")
 
 

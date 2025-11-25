@@ -1,0 +1,13 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 25.11.0  # Use the latest stable version
+    hooks:
+      - id: black
+        language_version: python3.11  # match your project interpreter
+        additional_dependencies: [ ]
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.14.6  # Use latest compatible version
+    hooks:
+      - id: ruff-check
+        args: [ "--fix" ]  # auto-fixable issues; remove if you don't want auto-fixes

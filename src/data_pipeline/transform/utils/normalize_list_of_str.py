@@ -1,3 +1,5 @@
+"""Transformer helper function to normalize a list of strings."""
+
 from typing import List
 
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
@@ -5,6 +7,7 @@ from src.utils.logger import logger
 
 
 def normalize_list_of_str(list_of_str: List[str], strict: bool = False) -> List[str] | None:
+    """Normalize a list of strings by stripping excessive whitespace and converting to lowercase."""
     if not list_of_str:
         return None
     if not isinstance(list_of_str, list):

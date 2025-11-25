@@ -1,14 +1,18 @@
+"""Transformer helper function to strip non-numerals from phone numbers."""
+
 import re
 
 from src.utils.logger import logger
 
 
-def transform_phone(phone: str, strict: bool = False) -> str | None:
+def transform_phone(phone: str, strict: bool = False, country_code: int = 1) -> str | None:
     """
-    Return a phone number with only numerals
-    Includes hard-coded country code of 1.
+    Return a phone number with only numerals.
+
+    Prepends country code to phone number if not present.
+    country code defaults to 1.
     """
-    country_code = "1"
+    country_code = country_code
     if isinstance(phone, list):
         if len(phone) > 1:
             logger.warning(f"Expected one phone in param list, got {len(phone)}")

@@ -1,3 +1,5 @@
+"""Settings module."""
+
 PIPELINE_STRICT = True
 
 config = {

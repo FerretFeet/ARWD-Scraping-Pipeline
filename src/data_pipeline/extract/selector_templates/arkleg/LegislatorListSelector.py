@@ -1,10 +1,13 @@
-"""Selector template for Arkleg.state.ar.us/Legislators/List"""
+"""Selector template for Arkleg.state.ar.us/Legislators/List."""
 
 from src.models.SelectorTemplate import SelectorTemplate
 
 
 class LegislatorListSelector(SelectorTemplate):
+    """Selector for Arkleg Legislator List Page."""
+
     def __init__(self, url: str):
+        """Initialize the selector template."""
         super().__init__(
             url=url,
             selectors={

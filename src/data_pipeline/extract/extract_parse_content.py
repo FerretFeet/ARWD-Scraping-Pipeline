@@ -1,4 +1,4 @@
-"""Function for extracting and parsing web page content using selector templates."""
+"""Pipeline function for extracting and parsing web page content using selector templates."""
 
 import time
 from typing import Dict, List
@@ -17,9 +17,7 @@ def extract_parse_content(
     Crawler: type[WebCrawler.Crawler],
     delay: float = 1.25,
 ) -> Dict[str, str | List[str]]:
-    """
-    General scraper for Arkansas state site pages.
-    """
+    """Pipeline function for extracting and parsing web page content using selector templates."""
     selector = selector_cls(base_url)  # type: ignore
     result = Crawler.get_content(selector, link, session)
     time.sleep(delay)

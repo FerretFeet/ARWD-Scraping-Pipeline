@@ -1,3 +1,5 @@
+"""Transformer Template for Arkleg Legislator."""
+
 from src.data_pipeline.transform.utils.cast_to_int import cast_to_int
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_list_of_str import (

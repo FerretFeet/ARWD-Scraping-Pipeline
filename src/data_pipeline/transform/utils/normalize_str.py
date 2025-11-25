@@ -1,13 +1,12 @@
+"""Transformer helper function to normalize strings."""
+
 import re
 
 from src.utils.logger import logger
 
 
 def normalize_str(string: str, strict: bool = False) -> str | None:
-    """
-    Normalize white space to single-spaces, no leading or trailing
-    All chars become lowercase.
-    """
+    """Normalize white space to single-space, no leading or trailing; All chars become lowercase."""
     if string is None:
         return None
     if isinstance(string, list):
@@ -30,4 +29,5 @@ def normalize_str(string: str, strict: bool = False) -> str | None:
 
 
 def normalize_space(s: str) -> str:
+    """Normalize white space to single-spaces, no leading or trailing."""
     return re.sub(r"\s+", " ", s.strip())

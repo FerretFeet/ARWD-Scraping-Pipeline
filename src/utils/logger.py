@@ -1,9 +1,12 @@
+"""Logger."""
+
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
 
 def setup_logger(log_path="app.log"):
+    """Initialize logger."""
     logger = logging.getLogger(__name__)
 
     logger.setLevel(logging.DEBUG)  # capture everything; handlers filter
@@ -15,9 +18,7 @@ def setup_logger(log_path="app.log"):
         backupCount=3,
     )
     general_handler.setLevel(logging.INFO)  # INFO, WARNING, ERROR, CRITICAL
-    general_handler.setFormatter(
-        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    )
+    general_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 
     # --- Warnings/errors log (WARNING+) ---
     warning_handler = RotatingFileHandler(
@@ -27,17 +28,13 @@ def setup_logger(log_path="app.log"):
     )
     warning_handler.setLevel(logging.WARNING)  # WARNING, ERROR, CRITICAL only
     warning_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s"
-        )
+        logging.Formatter("%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s")
     )
 
     # --- Console logging (optional) ---
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(
-        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-    )
+    console_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 
     # Add handlers
     logger.addHandler(general_handler)

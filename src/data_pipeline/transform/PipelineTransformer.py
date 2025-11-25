@@ -1,19 +1,21 @@
-"""pipeline function for transforming content"""
+"""pipeline function for transforming content."""
 
 from src.config.settings import config
 from src.utils.logger import logger
 
 
 class PipelineTransformer:
+    """Pipeline transformer for transforming content."""
+
     strict: bool = False
 
     def __init__(self, strict: bool | None = None):
+        """Initialize the transformer with strict flag."""
         self.strict: bool = config["strict"] if strict is None else strict
 
     def transform_content(self, template: dict, content: dict) -> dict:
         """
-        pipeline function for transforming content
-        each template is coupled with an extract/selector
+        Pipeline function for transforming content.
 
         Args:
             template (dict): template holding transform functions for each possible expected
@@ -22,6 +24,7 @@ class PipelineTransformer:
 
         Returns:
             dict: transformed content
+
         """
         transformed_content = {}
         failed_keys = []

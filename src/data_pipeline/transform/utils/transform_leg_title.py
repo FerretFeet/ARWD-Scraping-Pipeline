@@ -1,4 +1,4 @@
-"""Function for transforming legislator title"""
+"""Function for transforming legislator title."""
 
 from typing import Dict
 
@@ -8,7 +8,7 @@ from src.utils.logger import logger
 
 def transform_leg_title(title: list[str], strict: bool = False) -> Dict[str, str]:
     """
-    Transform string like -> "Representative Aaron Pilkington (R)"
+    Transform string like -> "Representative Aaron Pilkington (R)".
 
     Outputs:
     {f_name: str,

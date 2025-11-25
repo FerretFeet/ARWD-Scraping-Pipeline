@@ -1,3 +1,5 @@
+"""Selector template for arkleg.state.ar.us/Legislators/Detail?."""
+
 import re
 
 from bs4 import BeautifulSoup
@@ -7,7 +9,10 @@ from src.utils.logger import logger
 
 
 class LegislatorSelector(SelectorTemplate):
+    """Selector template for Arkleg legislator page."""
+
     def __init__(self, url: str):
+        """Initialize the selector template."""
         super().__init__(
             url=url,
             selectors={

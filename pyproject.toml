@@ -12,20 +12,24 @@ dependencies = [
 [dependency-groups]
 dev = [
     "black>=25.11.0",
+    "pre-commit>=4.5.0",
     "pytest>=9.0.1",
     "ruff>=0.14.6",
 ]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ['.venv', '__pycache__', '.html', '.log', '.ini']
 [tool.ruff.format]
 quote-style = 'single'
 indent-style = 'tab'
 docstring-code-format = true
-exclude = ['.venv', '__pycache__', '.html', '.log', '.ini']
 [tool.ruff.lint]
 select = ['E', 'F', 'D', 'I']
-ignore = ["E701"]
+ignore = ["E701", "D212", "D203"]
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ['D']
+"__init__.py" = ['D']
 
 [tool.black]
 line-length = 100

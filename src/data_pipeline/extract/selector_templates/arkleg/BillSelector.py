@@ -1,4 +1,4 @@
-"""Selector template for arkleg.state.ar.us/Bills/Detail?id=####"""
+"""Selector template for arkleg.state.ar.us/Bills/Detail?id=####."""
 
 import re
 
@@ -8,7 +8,10 @@ from src.models.SelectorTemplate import SelectorTemplate
 
 
 class BillSelector(SelectorTemplate):
+    """Selector for Arkleg bill page."""
+
     def __init__(self, url: str):
+        """Initialize the selector template."""
         super().__init__(
             url=url,
             selectors={
@@ -44,7 +47,7 @@ class _BillParsers:
     def _parse_bill_detail_table(
         soup: BeautifulSoup, label_text: str, target_attr: str | None = None
     ):
-        """Find the div that *contains* the label text"""
+        """Find the div that *contains* the label text."""
         label_el = soup.find("div", string=re.compile(re.escape(label_text), re.I))
         if label_el is None:
             return None
