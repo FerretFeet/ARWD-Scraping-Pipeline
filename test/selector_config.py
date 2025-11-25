@@ -12,12 +12,14 @@ from src.data_pipeline.extract.selector_templates.arkleg.BillSelector import Bil
 from src.data_pipeline.extract.selector_templates.arkleg.BillVoteSelector import BillVoteSelector
 from src.data_pipeline.extract.selector_templates.arkleg.LegislatorListSelector import LegislatorListSelector
 from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import LegislatorSelector
+from src.data_pipeline.transform.templates.arkleg.LegislatorTransformer import LegislatorTransformer
 from test.fixture_params import LEGISLATOR_FIXTURE_PARAMS, LEGISLATOR_LIST_PARAMS, BILL_CATEGORY_FIXTURE_PARAMS, \
     BILL_LIST_FIXTURE_PARAMS, BILL_FIXTURE_PARAMS, VOTE_PAGE_FIXTURE_PARAMS
 
 SELECTOR_TESTS = [
     {
         "selector_class": LegislatorSelector,
+        'transformer_class': LegislatorTransformer,
         "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
         "required_keys": ["title", "district", "seniority"],
     },
@@ -53,7 +55,6 @@ SELECTOR_TESTS = [
         "fixture_params": VOTE_PAGE_FIXTURE_PARAMS,
         "required_keys": ['title'],
     },
-
     # Add other selectors here...
 ]
 

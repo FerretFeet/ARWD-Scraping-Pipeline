@@ -2,6 +2,7 @@ from typing import List
 from bs4 import BeautifulSoup
 from requests import Session, RequestException
 
+from src.config.settings import config
 from src.models.SelectorTemplate import SelectorTemplate
 from src.utils.logger import logger
 
@@ -9,9 +10,10 @@ from src.utils.logger import logger
 class Crawler:
     strict: bool = False  # toggle for strict validation
 
-    def __init__(self, site: str):
+    def __init__(self, site: str, strict: bool | None = None):
         self.site = site
-        self.session = Session()
+        self.strict = config['strict'] if strict is None else strict
+        # self.session = Session()
 
     @staticmethod
     def get_page(session: Session, url: str) -> BeautifulSoup:
@@ -78,25 +80,25 @@ class Crawler:
 
 
     @staticmethod
-    def get_content(website: SelectorTemplate, path: str, session=None):
+    def get_content(template: SelectorTemplate, path: str, session=None):
         """
         The 'website.selectors' dict can contain:
         - key: (selector, attr, label) -> For simple, declarative scraping
         - key: callable_function(soup)      -> For complex, imperative scraping
         """
-        if not isinstance(website, SelectorTemplate) or not isinstance(path, str):
+        if not isinstance(template, SelectorTemplate) or not isinstance(path, str):
             message = (f'Parameter passed of incorrect type:\n'
-                       f'website: {type(website)}, path: {type(path)}')
+                       f'website: {type(template)}, path: {type(path)}')
             logger.error(message)
             raise TypeError(message)
 
-        page_url = website.url + path
+        page_url = template.url + path
         content_holder = {}
         session_flag = session is None
         session = session or Session()
         soup = Crawler.get_page(session, page_url)
         if soup:
-            for key, val in website.selectors.items():
+            for key, val in template.selectors.items():
                 if callable(val):
                     # If selector is a helper function
                     try:
@@ -124,6 +126,7 @@ class Crawler:
                     content_holder[key] = Crawler.safe_get(soup, *args)
 
         content_holder['rel_url'] = path
+        content_holder['base_url'] = template.url
         session.close() if session_flag else None
         logger.info(f'\nCrawler executed and retrieved content')
         return content_holder
