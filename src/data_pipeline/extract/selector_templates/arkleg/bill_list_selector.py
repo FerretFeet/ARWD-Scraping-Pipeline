@@ -1,6 +1,6 @@
 """Selector template for Arkleg.state.ar.us/Bills/ViewBills."""
 
-from src.models.SelectorTemplate import SelectorTemplate
+from src.models.selector_template import SelectorTemplate
 
 
 class BillListSelector(SelectorTemplate):
@@ -8,7 +8,7 @@ class BillListSelector(SelectorTemplate):
 
     next_page: str
 
-    def __init__(self, url: str):
+    def __init__(self, url: str) -> None:
         """Initialize the selector template."""
         super().__init__(
             url=url,

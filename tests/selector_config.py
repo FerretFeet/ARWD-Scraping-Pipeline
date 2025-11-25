@@ -6,25 +6,25 @@ Inputs:
 - required_keys (list of required successful selector attributes)
 """
 
-from src.data_pipeline.extract.selector_templates.arkleg.BillCategorySelector import (
+from src.data_pipeline.extract.selector_templates.arkleg.bill_category_selector import (
     BillCategorySelector,
 )
-from src.data_pipeline.extract.selector_templates.arkleg.BillListSelector import (
+from src.data_pipeline.extract.selector_templates.arkleg.bill_list_selector import (
     BillListSelector,
 )
-from src.data_pipeline.extract.selector_templates.arkleg.BillSelector import (
+from src.data_pipeline.extract.selector_templates.arkleg.bill_selector import (
     BillSelector,
 )
-from src.data_pipeline.extract.selector_templates.arkleg.BillVoteSelector import (
+from src.data_pipeline.extract.selector_templates.arkleg.bill_vote_selector import (
     BillVoteSelector,
 )
-from src.data_pipeline.extract.selector_templates.arkleg.LegislatorListSelector import (
+from src.data_pipeline.extract.selector_templates.arkleg.legislator_list_selector import (
     LegislatorListSelector,
 )
-from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import (
+from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
-from src.data_pipeline.transform.templates.arkleg.LegislatorTransformer import (
+from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
     LegislatorTransformer,
 )
 from tests.fixture_params import (

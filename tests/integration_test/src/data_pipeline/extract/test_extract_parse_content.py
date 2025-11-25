@@ -18,11 +18,11 @@ class DummyCrawler:
     """Minimal Crawler stub"""
 
     @staticmethod
-    def get_content(site, link, session):
+    def get_content(site, link, session) -> dict:  # noqa: ARG004
         return {"title": "Test Title", "data": ["item1", "item2"]}
 
 
-def test_extract_parse_content(monkeypatch):
+def test_extract_parse_content():
     # Arrange
     test_link = "/tests-page"
     test_base = "https://example.com"
@@ -35,7 +35,7 @@ def test_extract_parse_content(monkeypatch):
         base_url=test_base,
         session=test_session,
         selector_cls=DummySelector,
-        Crawler=DummyCrawler,
+        crawler=DummyCrawler,
         delay=delay,
     )
 

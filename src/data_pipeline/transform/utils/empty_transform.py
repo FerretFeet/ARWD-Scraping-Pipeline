@@ -1,6 +1,10 @@
 """Transformer helper function to return unchanged value."""
 
+from typing import TypeVar
 
-def empty_transform(arg, strict: bool = False):
+T = TypeVar("T")
+
+
+def empty_transform(arg: T, *, strict: bool = False) -> T:  # noqa: ARG001, UP047
     """Do nothing, return value unchanged."""
     return arg

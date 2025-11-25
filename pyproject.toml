@@ -21,15 +21,16 @@ dev = [
 [tool.ruff]
 line-length = 100
 extend-exclude = ['.venv', '__pycache__', '.html', '.log', '.ini']
+indent-width = 4
 [tool.ruff.format]
 quote-style = 'single'
-indent-style = 'tab'
 docstring-code-format = true
+indent-style = 'space'
 [tool.ruff.lint]
-select = ['E', 'F', 'D', 'I']
+select = ['ALL']
 ignore = ["E701", "D212", "D203"]
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ['D']
+"tests/*" = ['D', 'S101', 'ANN201', 'ANN204', 'INP001', 'ANN001']
 "__init__.py" = ['D']
 
 [tool.black]

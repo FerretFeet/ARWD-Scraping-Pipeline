@@ -1,9 +1,9 @@
 """main.py."""
 
 
-def main():
+def main() -> None:
     """Run the main function."""
-    print("Hello from pythonproject!")
+    print("Hello from pythonproject!")  # noqa: T201
 
 
 if __name__ == "__main__":

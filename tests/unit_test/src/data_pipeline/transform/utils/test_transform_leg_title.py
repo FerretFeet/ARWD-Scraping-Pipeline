@@ -8,7 +8,7 @@ from src.data_pipeline.transform.utils.transform_leg_title import (
 
 class TestTransformTitles:
     @pytest.mark.parametrize(
-        "input_string, expected_output",
+        ("input_string", "expected_output"),
         [
             # 1. Remove non numbers
             (
@@ -61,9 +61,9 @@ class TestTransformTitles:
         assert result == expected_output
 
 
-class Test_ParseName:
+class TestParseName:
     @pytest.mark.parametrize(
-        "input_name, expected_output",
+        ("input_name", "expected_output"),
         [
             # 1. Standard Case (First and Last Name)
             ("Representative Aaron Pilkington (R)", ("Aaron", "Pilkington")),

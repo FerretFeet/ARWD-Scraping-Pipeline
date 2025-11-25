@@ -3,7 +3,7 @@
 from src.utils.logger import logger
 
 
-def cast_to_int(string: str, strict: bool = False) -> int | None:
+def cast_to_int(string: str, *, strict: bool = False) -> int | None:
     """Cast a string to an int or None if it can't be cast to int."""
     if isinstance(string, list):
         if len(string) > 1:
@@ -15,8 +15,8 @@ def cast_to_int(string: str, strict: bool = False) -> int | None:
 
     try:
         return int(string)
-    except ValueError:
+    except ValueError as e:
         msg = f"Failed to cast {string} to int"
         if strict:
-            raise ValueError(msg)
+            raise ValueError(msg) from e
         return None

@@ -5,7 +5,7 @@ import pytest
 import requests
 from bs4 import BeautifulSoup
 
-from src.data_pipeline.extract.WebCrawler import Crawler
+from src.data_pipeline.extract.webcrawler import Crawler
 
 
 def pytest_addoption(parser):
@@ -18,7 +18,6 @@ def pytest_addoption(parser):
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "html"
-# FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def download_fixture(url: str, path: Path):

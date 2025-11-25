@@ -6,7 +6,7 @@ from src.data_pipeline.transform.utils.normalize_str import normalize_str
 class TestNormalizeStr:
     # --- Tests for normalize_str function ---
     @pytest.mark.parametrize(
-        "input_string, expected_output",
+        ("input_string", "expected_output"),
         [
             # 1. Standard Case (No change, lowercased)
             ("hello world", "hello world"),

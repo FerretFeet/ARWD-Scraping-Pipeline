@@ -5,7 +5,7 @@ import re
 from src.utils.logger import logger
 
 
-def normalize_str(string: str, strict: bool = False) -> str | None:
+def normalize_str(string: str, *, strict: bool = False) -> str | None:
     """Normalize white space to single-space, no leading or trailing; All chars become lowercase."""
     if string is None:
         return None
@@ -14,17 +14,17 @@ def normalize_str(string: str, strict: bool = False) -> str | None:
             msg = f"Expected 1 string, got {len(string)} instead"
             logger.warning(msg)
             if strict:
-                raise ValueError(msg)
+                raise TypeError(msg)
         string = string[0]
     try:
         string = normalize_space(string)
         # Convert to lowercase
         return string.lower()
-    except Exception:
-        msg = f"Unable to normalize string: {string}"
+    except (TypeError, AttributeError) as e:
+        msg = f"Unable to normalize string {string} \n {e}"
         logger.warning(msg)
         if strict:
-            raise ValueError(msg)
+            raise TypeError(msg) from e
         return None
 
 

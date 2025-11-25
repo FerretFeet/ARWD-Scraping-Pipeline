@@ -10,7 +10,7 @@ from src.data_pipeline.transform.utils.transform_leg_title import (
     transform_leg_title,
 )
 from src.data_pipeline.transform.utils.transform_phone import transform_phone
-from src.models.TransformerTemplate import TransformerTemplate
+from src.models.transformer_template import TransformerTemplate
 
 LegislatorTransformer: TransformerTemplate = {
     "base_url": empty_transform,

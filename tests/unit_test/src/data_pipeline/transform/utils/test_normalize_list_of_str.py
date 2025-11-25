@@ -14,6 +14,6 @@ class TestNormalizeListOfStr:
         assert result == expected_result
 
     def test_normalize_list_of_str_failure(self):
-        list_input = [lambda val: "bad input"]
-        with pytest.raises(ValueError):
+        list_input = [lambda: "bad input"]
+        with pytest.raises(TypeError):
             normalize_list_of_str(list_input, strict=True)

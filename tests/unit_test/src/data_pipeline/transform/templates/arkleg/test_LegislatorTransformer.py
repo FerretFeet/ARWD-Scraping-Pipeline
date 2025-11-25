@@ -1,6 +1,6 @@
 # ruff: noqa: E501
-from src.data_pipeline.transform.PipelineTransformer import PipelineTransformer
-from src.data_pipeline.transform.templates.arkleg.LegislatorTransformer import (
+from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
+from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
     LegislatorTransformer,
 )
 
@@ -9,7 +9,7 @@ input_val = {
     "phone": [""],
     "email": None,
     "address": [
-        "\n\n709 Sky Mountain Dr.,                                Rogers,\n                                72757\n                            \n"
+        "\n\n709 Sky Mountain Dr.,                                Rogers,\n                                72757\n                            \n",
     ],
     "district": ["3"],
     "seniority": ["1"],

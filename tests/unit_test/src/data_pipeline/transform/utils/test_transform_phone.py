@@ -6,10 +6,10 @@ from src.data_pipeline.transform.utils.transform_phone import transform_phone
 class TestNormalizePhone:
     # --- Tests for normalize_phone function ---
     @pytest.mark.parametrize(
-        "input_string, expected_output",
+        ("input_string", "expected_output"),
         [
             # 1. Remove non numbers
-            ("+1(555)-555-5555", "15555555555"),
+            (["+1(555)-555-5555"], "15555555555"),
             ("1 (555)-555 5555", "15555555555"),
             # 2. Do nothing
             ("15555555555", "15555555555"),
@@ -33,19 +33,20 @@ class TestNormalizePhone:
         assert result == expected_output
 
     @pytest.mark.parametrize(
-        "input_string, expected_output",
+        ("input_string", "expected_output"),
         [
             # 1. Remove non numbers
-            ("+1(555)-55555-5555", "15555555555"),
-            ("1(555)-555-55", "155555555"),
+            ("+1(555)-55555-5555", "Invalid length of phone number"),
+            ("1(555)-555-55", "Invalid length of phone number"),
+            (["1(555)-555-5555", "1234567890"], "Expected one phone in param list"),
         ],
     )
     def test_normalize_phone_strict_raises_error(self, input_string: str, expected_output: str):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match=expected_output):
             transform_phone(input_string, strict=True)
 
     @pytest.mark.parametrize(
-        "input_string, expected_output",
+        ("input_string", "expected_output"),
         [
             # 1. Remove non numbers
             ("+1(555)-555-5555", "15555555555"),

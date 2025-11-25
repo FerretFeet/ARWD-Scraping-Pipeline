@@ -4,14 +4,14 @@ import re
 
 from bs4 import BeautifulSoup
 
-from src.models.SelectorTemplate import SelectorTemplate
+from src.models.selector_template import SelectorTemplate
 from src.utils.logger import logger
 
 
 class LegislatorSelector(SelectorTemplate):
     """Selector template for Arkleg legislator page."""
 
-    def __init__(self, url: str):
+    def __init__(self, url: str) -> None:
         """Initialize the selector template."""
         super().__init__(
             url=url,
@@ -34,7 +34,7 @@ class LegislatorSelector(SelectorTemplate):
 
 class _LegislatorParsers:
     @staticmethod
-    def _parse_table_val(soup: BeautifulSoup, label_str: str):
+    def _parse_table_val(soup: BeautifulSoup, label_str: str) -> list[str] | None:
         label = re.compile(rf"^{label_str}\s*")
         result = []
         table = soup.find("div", attrs={"id": "tableDataWrapper"})
@@ -62,21 +62,21 @@ class _LegislatorParsers:
         return result
 
     @staticmethod
-    def parse_phone(soup: BeautifulSoup):
+    def parse_phone(soup: BeautifulSoup) -> list[str] | None:
         return _LegislatorParsers._parse_table_val(soup, "Phone:")
 
     @staticmethod
-    def parse_email(soup: BeautifulSoup):
+    def parse_email(soup: BeautifulSoup) -> list[str] | None:
         return _LegislatorParsers._parse_table_val(soup, "Email:")
 
     @staticmethod
-    def parse_district(soup: BeautifulSoup):
+    def parse_district(soup: BeautifulSoup) -> list[str] | None:
         return _LegislatorParsers._parse_table_val(soup, "District:")
 
     @staticmethod
-    def parse_seniority(soup: BeautifulSoup):
+    def parse_seniority(soup: BeautifulSoup) -> list[str] | None:
         return _LegislatorParsers._parse_table_val(soup, "Seniority:")
 
     @staticmethod
-    def parse_public_service(soup: BeautifulSoup):
+    def parse_public_service(soup: BeautifulSoup) -> list[str] | None:
         return _LegislatorParsers._parse_table_val(soup, "Public Service:")

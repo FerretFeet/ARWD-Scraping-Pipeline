@@ -3,8 +3,8 @@ from unittest.mock import patch
 import pytest
 from bs4 import BeautifulSoup
 
-from src.data_pipeline.extract import WebCrawler
-from src.data_pipeline.extract.selector_templates.arkleg.BillCategorySelector import (
+from src.data_pipeline.extract import webcrawler
+from src.data_pipeline.extract.selector_templates.arkleg.bill_category_selector import (
     BillCategorySelector,
 )
 from src.utils.paths import project_root
@@ -20,16 +20,18 @@ def known_bill_categories_soup_fixture() -> BeautifulSoup:
 
 
 class TestArStateLegislatorSelector:
-    @patch.object(WebCrawler.Crawler, "get_page")
+    @patch.object(webcrawler.Crawler, "get_page")
     def test_known_bill_category_known_return(
-        self, mock_get_page, known_bill_categories_soup_fixture
+        self,
+        mock_get_page,
+        known_bill_categories_soup_fixture,
     ):
         selector = BillCategorySelector("/stem/")
-        crawler = WebCrawler.Crawler("")
+        crawler = webcrawler.Crawler("")
         rel_url = "/return/path"
         mock_get_page.return_value = known_bill_categories_soup_fixture
         result = crawler.get_content(selector, rel_url)
 
         assert result is not None
 
-        assert len(result["bill_cat_link"]) == 9
+        assert len(result["bill_cat_link"]) == 9  # noqa: PLR2004

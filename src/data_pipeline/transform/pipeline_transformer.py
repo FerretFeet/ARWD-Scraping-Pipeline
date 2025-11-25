@@ -1,5 +1,7 @@
 """pipeline function for transforming content."""
 
+import html
+
 from src.config.settings import config
 from src.utils.logger import logger
 
@@ -7,13 +9,11 @@ from src.utils.logger import logger
 class PipelineTransformer:
     """Pipeline transformer for transforming content."""
 
-    strict: bool = False
-
-    def __init__(self, strict: bool | None = None):
+    def __init__(self, *, strict: bool | None = None) -> None:
         """Initialize the transformer with strict flag."""
         self.strict: bool = config["strict"] if strict is None else strict
 
-    def transform_content(self, template: dict, content: dict) -> dict:
+    def transform_content(self, template: dict, content: dict) -> dict:  # noqa: C901, PLR0912
         """
         Pipeline function for transforming content.
 
@@ -32,24 +32,29 @@ class PipelineTransformer:
             if value is None:
                 continue
             if key not in template:
-                logger.error(f"Key {key} not in template")
+                msg = f"Key {key} not in template"
+                logger.error(msg)
                 failed_keys.append(key)
                 if self.strict:
-                    raise KeyError(f"Key {key} not in template")
-                else:
-                    continue
+                    raise KeyError(msg)
+                continue
+
+            if isinstance(value, list):
+                new_value = [html.unescape(v) for v in value]
+            else:
+                new_value = html.unescape(value)
+
             transform_func = template[key]
 
             if not callable(transform_func):
-                logger.warning(f"Value {transform_func} is not callable for key {key}")
+                msg = f"Value {transform_func} is not callable for key {key}"
+
+                logger.warning(msg)
                 failed_keys.append(key)
-                if self.strict:
-                    raise TypeError(f"Value {transform_func} is not callable for key {key}")
-                else:
-                    continue
+                raise TypeError(msg)
 
             try:
-                transformed_val = transform_func(value)
+                transformed_val = transform_func(new_value)
 
                 if isinstance(transformed_val, dict):
                     transformed_content.update(transformed_val)
@@ -60,8 +65,7 @@ class PipelineTransformer:
                 failed_keys.append(key)
                 if self.strict:
                     raise
-                else:
-                    continue
+                continue
 
             except Exception as e:
                 logger.error(f"Error occurred while transforming {key}: {e}")
@@ -71,6 +75,6 @@ class PipelineTransformer:
         if failed_keys:
             logger.error(
                 f"Keys {failed_keys} encountered error while transforming {content} "
-                f"with {type(template)}"
+                f"with {type(template)}",
             )
         return transformed_content

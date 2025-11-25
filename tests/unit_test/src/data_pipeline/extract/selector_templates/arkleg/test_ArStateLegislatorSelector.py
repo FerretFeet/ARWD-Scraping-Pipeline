@@ -4,8 +4,8 @@ from unittest.mock import patch
 import pytest
 from bs4 import BeautifulSoup
 
-from src.data_pipeline.extract import WebCrawler
-from src.data_pipeline.extract.selector_templates.arkleg.LegislatorSelector import (
+from src.data_pipeline.extract import webcrawler
+from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
 from src.utils.paths import project_root
@@ -23,10 +23,10 @@ def known_legislator_soup_fixture() -> BeautifulSoup:
 
 
 class TestArStateLegislatorSelector:
-    @patch.object(WebCrawler.Crawler, "get_page")
+    @patch.object(webcrawler.Crawler, "get_page")
     def test_known_legislator_known_return(self, mock_get_page, known_legislator_soup_fixture):
         selector = LegislatorSelector("/stem/")
-        crawler = WebCrawler.Crawler("")
+        crawler = webcrawler.Crawler("")
         rel_url = "/return/path"
         mock_get_page.return_value = known_legislator_soup_fixture
         result = crawler.get_content(selector, rel_url)
@@ -43,7 +43,7 @@ class TestArStateLegislatorSelector:
         assert result["district"] == ["27"]
         assert result["seniority"] == ["25"]
         assert result["public_service"] == [
-            "Representative 2015,  2017,  2019,  2021,  Senate 2023,  2025"
+            "Representative 2015,  2017,  2019,  2021,  Senate 2023,  2025",
         ]
 
         # committees too big to check all, just check first and last
@@ -52,7 +52,7 @@ class TestArStateLegislatorSelector:
             result["committee_links"][0]
             == "/Committees/Detail?code=985&ddBienniumSession=2025%2F2025R"
         )
-        assert len(result["committee_links"]) == len(result["committees"]) == 30
+        assert len(result["committee_links"]) == len(result["committees"]) == 30  # noqa: PLR2004
         assert result["committees"][29].strip() == "JBC-ADMINISTRATIVE RULE REVIEW SUBCOMMITTEE"
         assert (
             result["committee_links"][29]

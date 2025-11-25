@@ -1,12 +1,10 @@
 """Transformer helper function to normalize a list of strings."""
 
-from typing import List
-
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.utils.logger import logger
 
 
-def normalize_list_of_str(list_of_str: List[str], strict: bool = False) -> List[str] | None:
+def normalize_list_of_str(list_of_str: list[str], *, strict: bool = False) -> list[str] | None:
     """Normalize a list of strings by stripping excessive whitespace and converting to lowercase."""
     if not list_of_str:
         return None
@@ -15,16 +13,16 @@ def normalize_list_of_str(list_of_str: List[str], strict: bool = False) -> List[
         logger.warning(msg)
         if strict:
             raise TypeError(msg)
+    result = []
     try:
-        result = []
         for s in list_of_str:
-            temp = normalize_str(s, strict)
+            temp = normalize_str(s, strict=strict)
             if temp is not None:
                 result.append(temp)
-        return result
     except TypeError as e:
         msg = f"could not transform list of str {e}"
         logger.warning(msg)
         if strict:
-            raise TypeError(msg)
+            raise TypeError(msg) from e
         return None
+    return result if result else None
