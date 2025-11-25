@@ -17,32 +17,31 @@ def transform_leg_title(title: list[str], strict: bool = False) -> Dict[str, str
        party: str}
     """
     if isinstance(title, list):
-        if len(title) >1:
-            logger.warning(f'Expected one title in list, got {len(title)} instead')
+        if len(title) > 1:
+            logger.warning(f"Expected one title in list, got {len(title)} instead")
             if strict:
-                raise Exception('Expected one title in list')
+                raise Exception("Expected one title in list")
         title = title[0]
 
     result = {
-        'party': _parse_party(title),
-        'f_name': (_parse_name(title))[0],
-        'l_name': (_parse_name(title))[1],
-        'chamber': _parse_chamber(title)
+        "party": _parse_party(title),
+        "f_name": (_parse_name(title))[0],
+        "l_name": (_parse_name(title))[1],
+        "chamber": _parse_chamber(title),
     }
-    print(f'params: \n'
-          f'{title}')
-    print(f'Result : \n{result}')
+    print(f"params: \n{title}")
+    print(f"Result : \n{result}")
     return {
-        'party': normalize_str(result['party']) if result['party'] else None,
-        'f_name': normalize_str(result['f_name']) if result['f_name'] else None,
-        'l_name': normalize_str(result['l_name']) if result['l_name'] else None,
-        'chamber': normalize_str(result['chamber'] if result['chamber'] else None)
+        "party": normalize_str(result["party"]) if result["party"] else None,
+        "f_name": normalize_str(result["f_name"]) if result["f_name"] else None,
+        "l_name": normalize_str(result["l_name"]) if result["l_name"] else None,
+        "chamber": normalize_str(result["chamber"] if result["chamber"] else None),
     }
 
 
 def _parse_party(title):
     if "(" and ")" in title:
-        party = title[title.find("(") + 1: title.find(")")]
+        party = title[title.find("(") + 1 : title.find(")")]
         return party
     else:
         return None
@@ -50,14 +49,14 @@ def _parse_party(title):
 
 def _parse_chamber(title):
     words = title.split()
-    house_chamber_strs = ['representative', 'house']
-    senate_chamber_strs = ['senator', 'senate']
+    house_chamber_strs = ["representative", "house"]
+    senate_chamber_strs = ["senator", "senate"]
     if words and words[0].lower() in house_chamber_strs + senate_chamber_strs:
         chamber = words[0]
         if chamber.lower() in house_chamber_strs:
-            return 'house'
+            return "house"
         elif chamber.lower() in senate_chamber_strs:
-            return 'senate'
+            return "senate"
     return None
 
 
@@ -73,9 +72,11 @@ def _parse_name(title):
     else:
         name_words = name_part.split()
         name = " ".join(name_words)
-    if not name: return return_val
+    if not name:
+        return return_val
     split_names = name.split(" ", maxsplit=1)
-    if not split_names: return return_val
+    if not split_names:
+        return return_val
     if len(split_names) == 2:
         f_name = split_names[0]
         l_name = split_names[1]
@@ -85,5 +86,3 @@ def _parse_name(title):
     return_val = (f_name, l_name)
 
     return return_val
-
-

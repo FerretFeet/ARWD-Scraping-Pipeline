@@ -1,4 +1,5 @@
 """pipeline function for transforming content"""
+
 from src.config.settings import config
 from src.utils.logger import logger
 
@@ -7,8 +8,7 @@ class PipelineTransformer:
     strict: bool = False
 
     def __init__(self, strict: bool | None = None):
-        self.strict: bool = config['strict'] if strict is None else strict
-
+        self.strict: bool = config["strict"] if strict is None else strict
 
     def transform_content(self, template: dict, content: dict) -> dict:
         """
@@ -16,7 +16,8 @@ class PipelineTransformer:
         each template is coupled with an extract/selector
 
         Args:
-            template (dict): template holding transform functions for each possible expected content.key
+            template (dict): template holding transform functions for each possible expected
+                content.key
             content (dict): content to be transformed
 
         Returns:
@@ -25,13 +26,15 @@ class PipelineTransformer:
         transformed_content = {}
         failed_keys = []
         for key, value in content.items():
-            if value is None: continue
+            if value is None:
+                continue
             if key not in template:
                 logger.error(f"Key {key} not in template")
                 failed_keys.append(key)
                 if self.strict:
                     raise KeyError(f"Key {key} not in template")
-                else: continue
+                else:
+                    continue
             transform_func = template[key]
 
             if not callable(transform_func):
@@ -39,10 +42,10 @@ class PipelineTransformer:
                 failed_keys.append(key)
                 if self.strict:
                     raise TypeError(f"Value {transform_func} is not callable for key {key}")
-                else: continue
+                else:
+                    continue
 
             try:
-
                 transformed_val = transform_func(value)
 
                 if isinstance(transformed_val, dict):
@@ -54,7 +57,8 @@ class PipelineTransformer:
                 failed_keys.append(key)
                 if self.strict:
                     raise
-                else: continue
+                else:
+                    continue
 
             except Exception as e:
                 logger.error(f"Error occurred while transforming {key}: {e}")
@@ -62,8 +66,8 @@ class PipelineTransformer:
                 raise
 
         if failed_keys:
-            logger.error(f"Keys {failed_keys} encountered error while transforming {content} with {type(template)}")
+            logger.error(
+                f"Keys {failed_keys} encountered error while transforming {content} "
+                f"with {type(template)}"
+            )
         return transformed_content
-
-
-

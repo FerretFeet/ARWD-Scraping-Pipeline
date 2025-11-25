@@ -11,29 +11,44 @@ class TestTransformTitles:
         "input_string, expected_output",
         [
             # 1. Remove non numbers
-            ("representative aaron pilkington (r)",
-             {'f_name': 'aaron',
-              'l_name': 'pilkington',
-              'chamber': 'house',
-              'party': 'r'}),
+            (
+                "representative aaron pilkington (r)",
+                {
+                    "f_name": "aaron",
+                    "l_name": "pilkington",
+                    "chamber": "house",
+                    "party": "r",
+                },
+            ),
             # 2. handles missing data
-            ("senator john s. doe",
-             {'f_name': 'john',
-              'l_name': 's. doe',
-              'chamber': 'senate',
-              'party': None}),
-            ("john doe (r)",
-             {'f_name': 'john',
-              'l_name': 'doe',
-              'chamber': None,
-              'party': 'r'}),
-            ("john (r)",
-             {'f_name': None,
-              'l_name': 'john',
-              'chamber': None,
-              'party': 'r'}),
-
-        ]
+            (
+                "senator john s. doe",
+                {
+                    "f_name": "john",
+                    "l_name": "s. doe",
+                    "chamber": "senate",
+                    "party": None,
+                },
+            ),
+            (
+                "john doe (r)",
+                {
+                    "f_name": "john",
+                    "l_name": "doe",
+                    "chamber": None,
+                    "party": "r",
+                },
+            ),
+            (
+                "john (r)",
+                {
+                    "f_name": None,
+                    "l_name": "john",
+                    "chamber": None,
+                    "party": "r",
+                },
+            ),
+        ],
     )
     def test_transform_leg_title(self, input_string: str, expected_output: str):
         """
@@ -48,32 +63,27 @@ class TestTransformTitles:
 
 
 class Test_ParseName:
-
     @pytest.mark.parametrize(
         "input_name, expected_output",
         [
             # 1. Standard Case (First and Last Name)
-            ('Representative Aaron Pilkington (R)', ('Aaron', 'Pilkington')),
+            ("Representative Aaron Pilkington (R)", ("Aaron", "Pilkington")),
             ("Jane Doe", ("Jane", "Doe")),
             ("John Smith", ("John", "Smith")),
-
             # 2. Multi-word Name (Middle names become part of the Last Name)
             ("Michael B. Jordan", ("Michael", "B. Jordan")),
             ("John Fitzgerald Kennedy", ("John", "Fitzgerald Kennedy")),
             ("Alice Cooper Smith", ("Alice", "Cooper Smith")),
-
             # 3. Single Word Name
             ("Cher", (None, "Cher")),
             ("Madonna", (None, "Madonna")),
-            ('john (r)', (None, 'john')),
-
+            ("john (r)", (None, "john")),
             # 4. Leading/Trailing Whitespace
             (" Leading Space", ("Leading", "Space")),
             ("Trailing Space  ", ("Trailing", "Space")),
             (" Internal      Space ", ("Internal", "Space")),
             (" Internal   Middle   Space ", ("Internal", "Middle Space")),
-
-        ]
+        ],
     )
     def test_parse_name_logic(self, input_name, expected_output):
         """
@@ -84,4 +94,3 @@ class Test_ParseName:
 
         # ASSERT
         assert result == expected_output
-

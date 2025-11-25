@@ -12,30 +12,29 @@ class BillVoteSelector(SelectorTemplate):
         super().__init__(
             url=url,
             selectors={
-                'title': ('div h1'),
-                'yea_names': _VoteListParsers.parse_yea_names,
-                'yea_links': _VoteListParsers.parse_yea_links,
-                'nay_names': _VoteListParsers.parse_nay_names,
-                'nay_links': _VoteListParsers.parse_nay_links,
-                'non_voting_names': _VoteListParsers.parse_non_voting_names,
-                'non_voting_links': _VoteListParsers.parse_non_voting_links,
-                'present_names': _VoteListParsers.parse_present_names,
-                'present_links': _VoteListParsers.parse_present_links,
-                'excused_names': _VoteListParsers.parse_excused_names,
-                'excused_links': _VoteListParsers.parse_excused_links,
-
+                "title": ("div h1"),
+                "yea_names": _VoteListParsers.parse_yea_names,
+                "yea_links": _VoteListParsers.parse_yea_links,
+                "nay_names": _VoteListParsers.parse_nay_names,
+                "nay_links": _VoteListParsers.parse_nay_links,
+                "non_voting_names": _VoteListParsers.parse_non_voting_names,
+                "non_voting_links": _VoteListParsers.parse_non_voting_links,
+                "present_names": _VoteListParsers.parse_present_names,
+                "present_links": _VoteListParsers.parse_present_links,
+                "excused_names": _VoteListParsers.parse_excused_names,
+                "excused_links": _VoteListParsers.parse_excused_links,
             },
         )
 
 
-class _VoteListParsers():
+class _VoteListParsers:
     @staticmethod
     def _parse_votes(soup: BeautifulSoup, vote_cat: str, attr: str | None = None):
         regex = re.compile(rf"{vote_cat}\s*:\s*(\d+)", re.I)
         label = None
         match = None
         # Find the correct <b> tag
-        for b in soup.find_all('b'):
+        for b in soup.find_all("b"):
             match = regex.search(b.get_text())
             if match:
                 label = b
@@ -48,7 +47,7 @@ class _VoteListParsers():
         if count == 0:
             return []  # no votes, return empty list
 
-        row_div = label.find_parent('div', class_='row')
+        row_div = label.find_parent("div", class_="row")
         if not row_div:
             return None
 
@@ -66,40 +65,40 @@ class _VoteListParsers():
 
     @staticmethod
     def parse_yea_names(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Yeas')
+        return _VoteListParsers._parse_votes(soup, "Yeas")
 
     @staticmethod
     def parse_yea_links(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Yeas', 'href')
+        return _VoteListParsers._parse_votes(soup, "Yeas", "href")
 
     @staticmethod
     def parse_nay_names(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Nays')
+        return _VoteListParsers._parse_votes(soup, "Nays")
 
     @staticmethod
     def parse_nay_links(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Nays', 'href')
+        return _VoteListParsers._parse_votes(soup, "Nays", "href")
 
     @staticmethod
     def parse_non_voting_names(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Non Voting')
+        return _VoteListParsers._parse_votes(soup, "Non Voting")
 
     @staticmethod
     def parse_non_voting_links(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Non Voting', 'href')
+        return _VoteListParsers._parse_votes(soup, "Non Voting", "href")
 
     @staticmethod
     def parse_present_names(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Present')
+        return _VoteListParsers._parse_votes(soup, "Present")
 
     @staticmethod
     def parse_present_links(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Present', 'href')
+        return _VoteListParsers._parse_votes(soup, "Present", "href")
 
     @staticmethod
     def parse_excused_names(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Excused')
+        return _VoteListParsers._parse_votes(soup, "Excused")
 
     @staticmethod
     def parse_excused_links(soup: BeautifulSoup):
-        return _VoteListParsers._parse_votes(soup, 'Excused', 'href')
+        return _VoteListParsers._parse_votes(soup, "Excused", "href")

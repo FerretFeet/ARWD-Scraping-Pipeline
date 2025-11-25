@@ -13,14 +13,13 @@ def pytest_addoption(parser):
         "--refresh-html-fixtures",
         action="store_true",
         default=False,
-        help="Download missing HTML fixtures if they are not present locally."
+        help="Download missing HTML fixtures if they are not present locally.",
     )
-
-
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "html"
 # FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def download_fixture(url: str, path: Path):
     resp = requests.get(url, timeout=10)

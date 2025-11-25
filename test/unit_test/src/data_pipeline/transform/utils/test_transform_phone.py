@@ -18,11 +18,9 @@ class TestNormalizePhone:
             ("5555555555", "15555555555"),
             # 4. Keeps country code if over 10-digit
             ("455555555555", "455555555555"),
-
             # 5. Returns cleaned number even with insufficient digits
             ("1(555)-555-55", "155555555"),
-
-        ]
+        ],
     )
     def test_normalize_phone_logic(self, input_string: str, expected_output: str):
         """
@@ -34,13 +32,15 @@ class TestNormalizePhone:
 
         # ASSERT
         assert result == expected_output
+
     @pytest.mark.parametrize(
         "input_string, expected_output",
         [
             # 1. Remove non numbers
             ("+1(555)-55555-5555", "15555555555"),
-            ("1(555)-555-55", "155555555")
-        ])
+            ("1(555)-555-55", "155555555"),
+        ],
+    )
     def test_normalize_phone_strict_raises_error(self, input_string: str, expected_output: str):
         with pytest.raises(Exception):
             transform_phone(input_string, strict=True)
@@ -58,7 +58,8 @@ class TestNormalizePhone:
             ("5555555555", "15555555555"),
             # 4. Keeps country code if over 10-digit
             ("45555555555", "45555555555"),
-    ])
+        ],
+    )
     def test_normalize_phone_strict_success(self, input_string: str, expected_output: str):
         result = transform_phone(input_string, strict=True)
         assert result == expected_output

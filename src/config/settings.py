@@ -1,5 +1,5 @@
 PIPELINE_STRICT = True
 
 config = {
-    'strict': PIPELINE_STRICT,
+    "strict": PIPELINE_STRICT,
 }

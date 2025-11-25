@@ -9,10 +9,11 @@ for pipeline_info in SELECTOR_TESTS:
     for param in pipeline_info["fixture_params"]:
         param_list.append((pipeline_info, param))  # param is (name, url, variant)
 
+
 @pytest.mark.parametrize(
     "pipeline_info,html_selector_fixture",
     param_list,
-    indirect=["html_selector_fixture"]  # <-- tell pytest this param is for a fixture
+    indirect=["html_selector_fixture"],  # <-- tell pytest this param is for a fixture
 )
 def test_selector_success_all(pipeline_info, html_selector_fixture):
     """
@@ -41,8 +42,5 @@ def test_selector_success_all(pipeline_info, html_selector_fixture):
     if transformer_class is not None:
         transformer = PipelineTransformer()
         transformed_result = transformer.transform_content(transformer_class, result)
-        print(f'\nPRE TRANSFORM \n {result}')
-        print(f'\nTRANSFORMED \n {transformed_result}')
-
-
-
+        print(f"\nPRE TRANSFORM \n {result}")
+        print(f"\nTRANSFORMED \n {transformed_result}")

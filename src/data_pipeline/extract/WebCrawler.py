@@ -13,7 +13,7 @@ class Crawler:
 
     def __init__(self, site: str, strict: bool | None = None):
         self.site = site
-        self.strict = config['strict'] if strict is None else strict
+        self.strict = config["strict"] if strict is None else strict
         # self.session = Session()
 
     @staticmethod
@@ -22,8 +22,10 @@ class Crawler:
         Make an http request and return a beautiful soup object of the page
         """
         if not isinstance(session, Session) or not isinstance(url, str):
-            message = f'Parameter inserted of incorrect type. \n' \
-                      f'session (Session) {type(session)}, url (str) {type(url)}'
+            message = (
+                f"Parameter inserted of incorrect type. \n"
+                f"session (Session) {type(session)}, url (str) {type(url)}"
+            )
             logger.error(message)
             raise TypeError(message)
         try:
@@ -32,29 +34,34 @@ class Crawler:
 
         except RequestException as e:
             # Propagate network/HTTP errors as a specific application exception
-            message = f'Failed to fetch URL {url}: {e}'
+            message = f"Failed to fetch URL {url}: {e}"
             logger.error(message)
             raise ConnectionError(message)
 
         except Exception as e:
-            message = f'Failed to fetch URL {url}: {e}'
+            message = f"Failed to fetch URL {url}: {e}"
             logger.error(message)
             raise Exception(e)
 
-        return BeautifulSoup(html.text, 'html.parser')
+        return BeautifulSoup(html.text, "html.parser")
 
     @staticmethod
-    def safe_get(soup: BeautifulSoup, selector: str, attr: str = 'text') -> List[str] | None:
+    def safe_get(soup: BeautifulSoup, selector: str, attr: str = "text") -> List[str] | None:
         """
         Utility Function to get a specified attribute from a beautiful soup object.
         Selects text attribute of element by default
         Returns None on failure or a List of Strings on success
         """
-        if not isinstance(soup, BeautifulSoup) \
-        or not isinstance(selector, str) \
-        or not isinstance(attr, str):
-            message = (f'Parameter passed of incorrect type: \n'
-                       f'soup (bs4): {type(soup)}, selector (str): {type(selector)}, attr (str): {type(attr)}')
+        if (
+            not isinstance(soup, BeautifulSoup)
+            or not isinstance(selector, str)
+            or not isinstance(attr, str)
+        ):
+            message = (
+                f"Parameter passed of incorrect type: \n"
+                f"soup (bs4): {type(soup)}, selector (str): {type(selector)}, "
+                f"attr (str): {type(attr)}"
+            )
             logger.error(message)
             raise TypeError(message)
 
@@ -66,7 +73,7 @@ class Crawler:
             return None
         values: List[str] = []
         for elem in selected_elems:
-            if attr == 'text':
+            if attr == "text":
                 values.append(elem.text)
             elif elem.has_attr(attr):
                 values.append(elem.get(attr))
@@ -78,8 +85,6 @@ class Crawler:
                 continue
         return values if values else None
 
-
-
     @staticmethod
     def get_content(template: SelectorTemplate, path: str, session=None):
         """
@@ -88,8 +93,10 @@ class Crawler:
         - key: callable_function(soup)      -> For complex, imperative scraping
         """
         if not isinstance(template, SelectorTemplate) or not isinstance(path, str):
-            message = (f'Parameter passed of incorrect type:\n'
-                       f'website: {type(template)}, path: {type(path)}')
+            message = (
+                f"Parameter passed of incorrect type:\n"
+                f"website: {type(template)}, path: {type(path)}"
+            )
             logger.error(message)
             raise TypeError(message)
 
@@ -119,16 +126,17 @@ class Crawler:
                         elif len(val) == 2:
                             selector, attr = val
                         else:
-                            logger.error(f"Too many values input to selector tuple: \n {key}:  {val}")
-                            raise Exception(f'Too many args in selector tuple: {val}')
+                            logger.error(
+                                f"Too many values input to selector tuple: \n {key}:  {val}"
+                            )
+                            raise Exception(f"Too many args in selector tuple: {val}")
                     else:
                         selector = val
                     args = [selector] if attr is None else [selector, attr]
                     content_holder[key] = Crawler.safe_get(soup, *args)
 
-        content_holder['rel_url'] = path
-        content_holder['base_url'] = template.url
+        content_holder["rel_url"] = path
+        content_holder["base_url"] = template.url
         session.close() if session_flag else None
-        logger.info('\nCrawler executed and retrieved content')
+        logger.info("\nCrawler executed and retrieved content")
         return content_holder
-

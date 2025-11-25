@@ -21,20 +21,21 @@ def mock_session():
 # Helper functions
 # --------------------
 
+
 def create_mock_selector_template() -> Mock:
     """Return a mock object resembling a Website instance with static selectors"""
     mock_website = Mock(SelectorTemplate)
     mock_website.url = "http://example.com"
     mock_website.selectors = {
         "titleTag": "h1#title",
-        "linkTag": (".link", "href")
+        "linkTag": (".link", "href"),
     }
     return mock_website
 
 
 def parse_with_callable(soup: BeautifulSoup) -> List | None:
     """Example callable selector function to use in mocks"""
-    temp = Crawler.safe_get(soup, 'a.link')
+    temp = Crawler.safe_get(soup, "a.link")
     if temp:
         return temp
 
@@ -45,9 +46,7 @@ def create_mock_selector_template_callable() -> Mock:
     mock_website.name = "Mock Site"
     mock_website.url = "http://example.com"
 
-    mock_website.selectors = {
-        "linkTag": parse_with_callable
-    }
+    mock_website.selectors = {"linkTag": parse_with_callable}
     return mock_website
 
 
@@ -70,7 +69,7 @@ def create_mock_soup() -> BeautifulSoup:
         </body>
     </html>
     """
-    return BeautifulSoup(html_content, 'html.parser')
+    return BeautifulSoup(html_content, "html.parser")
 
 
 # --------------------
@@ -99,7 +98,9 @@ class TestGetPage:
 
         crawler = Crawler(site)
         soup = crawler.get_page(session, url)
-        assert isinstance(soup, BeautifulSoup), "get_page method should return a BeautifulSoup object"
+        assert isinstance(
+            soup, BeautifulSoup
+        ), "get_page method should return a BeautifulSoup object"
 
     def test_get_page_raises_connection_error(self, mock_session):
         site = "http://www.example.com"
@@ -128,7 +129,7 @@ class TestGetPage:
         url = "http://www.example.com"
         session = mock_session
 
-        session.get.side_effect = Exception('something bad')
+        session.get.side_effect = Exception("something bad")
 
         crawler = Crawler(site)
         with pytest.raises(Exception):
@@ -152,6 +153,7 @@ class TestGetPage:
 
 class TestSafeGet:
     soup = create_mock_soup()
+
     def test_safe_get_defaults_text(self):
         soup = self.soup
         crawler = Crawler("http://www.example.com")
@@ -164,8 +166,8 @@ class TestSafeGet:
         """Tests retrieving a non-standard attribute like a data attribute."""
         soup = self.soup
         crawler = Crawler("http://www.example.com")
-        selector = 'div'
-        attribute_name = 'data-value'
+        selector = "div"
+        attribute_name = "data-value"
         expected_result = ["123"]
         result = crawler.safe_get(soup, selector, attribute_name)
         assert result == expected_result
@@ -173,7 +175,7 @@ class TestSafeGet:
     def test_safe_get_no_match_returns_none(self):
         soup = self.soup
         crawler = Crawler("http://www.example.com")
-        selector = 'div.nonexistent-div'
+        selector = "div.nonexistent-div"
         result = crawler.safe_get(soup, selector)
         assert result is None
 
@@ -181,7 +183,7 @@ class TestSafeGet:
         soup = self.soup
         selector = "div[aria-colindex='3']"
         result = Crawler.safe_get(soup, selector)
-        assert result ==['']
+        assert result == [""]
 
     def test_safe_get_raises_type_error_with_incorrect_params(self):
         soup = self.soup
@@ -194,15 +196,14 @@ class TestSafeGet:
     def test_safe_get_strict_mode_raises_error(self):
         soup = self.soup
         # Use patch to temporarily set strict to True without affecting other tests
-        with patch.object(Crawler, 'strict', True):
+        with patch.object(Crawler, "strict", True):
             # Test missing selector
             with pytest.raises(ValueError, match="returned nothing"):
-                Crawler.safe_get(soup, 'div.nonexistent')
+                Crawler.safe_get(soup, "div.nonexistent")
 
             # Test missing attribute
             with pytest.raises(AttributeError, match="does not have attribute"):
-                Crawler.safe_get(soup, 'h1', 'nonexistent-attr')
-
+                Crawler.safe_get(soup, "h1", "nonexistent-attr")
 
 
 class TestGetContent:
@@ -215,32 +216,31 @@ class TestGetContent:
         result = Crawler.get_content(website, path)
 
         # This now works because we return a ScrapeResult object
-        assert result['rel_url'] == path
+        assert result["rel_url"] == path
         # Depending on how create_real_soup is set up, ensure these assertions match
-        assert result['titleTag'] == ["Page Title Text"]
+        assert result["titleTag"] == ["Page Title Text"]
 
     @patch.object(Crawler, "get_page")
     def test_get_content_callable_selector(self, mock_get_page):
         # content_holder removed from arguments (it was causing the crash)
         website = create_mock_selector_template_callable()
         mock_get_page.return_value = create_mock_soup()
-        path = ''
+        path = ""
 
         # Corrected arguments
         result = Crawler.get_content(website, path)
-        assert result['linkTag'] == ['First Link Text', 'Second Link Text']
+        assert result["linkTag"] == ["First Link Text", "Second Link Text"]
 
     @patch.object(Crawler, "get_page")
     def test_get_content_short_selector(self, mock_get_page):
         website = create_mock_selector_template()
         # CORRECTED: Added comma to make it a tuple
-        website.selectors['titleTag'] = ('h1',)
+        website.selectors["titleTag"] = ("h1",)
         mock_get_page.return_value = create_mock_soup()
-        path = ''
+        path = ""
 
         result = Crawler.get_content(website, path)
-        assert result['titleTag'] == ['Page Title Text']
-
+        assert result["titleTag"] == ["Page Title Text"]
 
     @patch.object(Crawler, "get_page")
     def test_get_content_bad_params(self, mock_get_page):
@@ -248,7 +248,7 @@ class TestGetContent:
         mock_get_page.return_value = create_mock_soup()
 
         with pytest.raises(TypeError):
-            Crawler.get_content(123, 'valid param')
+            Crawler.get_content(123, "valid param")
         with pytest.raises(TypeError):
             Crawler.get_content(website, 123)
 
@@ -256,14 +256,14 @@ class TestGetContent:
     def test_get_content_returns_none(self, mock_get_page):
         website = create_mock_selector_template()
 
-        website.selectors['badSelector'] = 'p#NotAMatch'
-        website.selectors['badSelectorTuple'] = ('p#NotAMatch',)
+        website.selectors["badSelector"] = "p#NotAMatch"
+        website.selectors["badSelectorTuple"] = ("p#NotAMatch",)
 
         mock_get_page.return_value = create_mock_soup()
-        result = Crawler.get_content(website, 'false_path')
-        assert result['rel_url'] == 'false_path'
-        assert result['badSelector'] is None
-        assert result['badSelectorTuple'] is None
+        result = Crawler.get_content(website, "false_path")
+        assert result["rel_url"] == "false_path"
+        assert result["badSelector"] is None
+        assert result["badSelectorTuple"] is None
 
     def test_session_management_internal(self):
         """Test that Crawler closes the session if it created it internally."""
@@ -274,7 +274,7 @@ class TestGetContent:
             mock_session_instance = MockSessionClass.return_value
             # Mock get_page to avoid actual network calls
             with patch.object(Crawler, "get_page", return_value=create_mock_soup()):
-                Crawler.get_content(website, '/test')
+                Crawler.get_content(website, "/test")
 
             # Assert session was closed
             mock_session_instance.close.assert_called_once()
@@ -285,7 +285,7 @@ class TestGetContent:
         external_session = Mock(spec=requests.Session)
 
         with patch.object(Crawler, "get_page", return_value=create_mock_soup()):
-            Crawler.get_content(website, '/test', session=external_session)
+            Crawler.get_content(website, "/test", session=external_session)
 
         # Assert external session was NOT closed
         external_session.close.assert_not_called()
@@ -297,12 +297,9 @@ class TestGetContent:
         def crashing_parser(soup):
             raise ValueError("Parser exploded")
 
-        website.selectors['crashyTag'] = crashing_parser
+        website.selectors["crashyTag"] = crashing_parser
         mock_get_page.return_value = create_mock_soup()
 
         # Should not raise exception, but return None for that key
-        result = Crawler.get_content(website, '')
-        assert result['crashyTag'] is None
-
-
-
+        result = Crawler.get_content(website, "")
+        assert result["crashyTag"] is None

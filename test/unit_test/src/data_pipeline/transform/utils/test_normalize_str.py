@@ -4,31 +4,26 @@ from src.data_pipeline.transform.utils.normalize_str import normalize_str
 
 
 class TestNormalizeStr:
-
     # --- Tests for normalize_str function ---
     @pytest.mark.parametrize(
         "input_string, expected_output",
         [
             # 1. Standard Case (No change, lowercased)
             ("hello world", "hello world"),
-
             # 2. Leading and Trailing Whitespace
             ("  trim me  ", "trim me"),
             ("\t\nnewline and tab\t", "newline and tab"),
-
             # 3. Multiple Internal Spaces/Whitespace
             ("A  B\tC\n D", "a b c d"),
             ("multiple   spaces here", "multiple spaces here"),
-
             # 4. Uppercase/Mixed Case (This confirms the lowercasing behavior)
             ("HELLO WORLD", "hello world"),
             ("MiXeD cAsE Test", "mixed case test"),
-
             # 5. Empty/Whitespace only
             ("", ""),
             ("   ", ""),
             ("\t\n", ""),
-        ]
+        ],
     )
     def test_normalize_str_logic(self, input_string: str, expected_output: str):
         """

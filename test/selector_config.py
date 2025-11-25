@@ -6,6 +6,7 @@ Inputs:
 - fixture_params (located in ./html_fixture_params.py))
 - required_keys (list of required successful selector attributes)
 """
+
 from src.data_pipeline.extract.selector_templates.arkleg.BillCategorySelector import (
     BillCategorySelector,
 )
@@ -39,7 +40,7 @@ from test.fixture_params import (
 SELECTOR_TESTS = [
     {
         "selector_class": LegislatorSelector,
-        'transformer_class': LegislatorTransformer,
+        "transformer_class": LegislatorTransformer,
         "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
         "required_keys": ["title", "district", "seniority"],
     },
@@ -56,25 +57,25 @@ SELECTOR_TESTS = [
     {
         "selector_class": BillListSelector,
         "fixture_params": BILL_LIST_FIXTURE_PARAMS,
-        "required_keys": ["chamber", 'session', 'bill_url'],
+        "required_keys": ["chamber", "session", "bill_url"],
     },
     {
         "selector_class": BillSelector,
         "fixture_params": BILL_FIXTURE_PARAMS,
-        "required_keys": ["title",
-                          'bill_no',
-                          'bill_no_dwnld',
-                          'orig_chamber',
-                          'lead_sponsor',
-                          'lead_sponsor_link',
-                          'intro_date'
-                          ],
+        "required_keys": [
+            "title",
+            "bill_no",
+            "bill_no_dwnld",
+            "orig_chamber",
+            "lead_sponsor",
+            "lead_sponsor_link",
+            "intro_date",
+        ],
     },
     {
         "selector_class": BillVoteSelector,
         "fixture_params": VOTE_PAGE_FIXTURE_PARAMS,
-        "required_keys": ['title'],
+        "required_keys": ["title"],
     },
     # Add other selectors here...
 ]
-
