@@ -18,6 +18,7 @@ from src.data_pipeline.transform.templates.arkleg.legislator_list_transformer im
 from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
     LegislatorTransformer,
 )
+from src.data_pipeline.validate.models.arkleg.bill_category import BillCategoryValidator
 from tests.configs.transform_fixture_params import (
     BILL_CAT_TRANSFORM_PATHS,
     BILL_LIST_TRANSFORM_PATHS,
@@ -39,6 +40,7 @@ TRANSFORMER_TESTS = [
     {
         "transformer_dict": BillCategoryTransformer,
         "fixture_params": BILL_CAT_TRANSFORM_PATHS,
+        "validator_cls": BillCategoryValidator,
     },
     {
         "transformer_dict": BillListTransformer,

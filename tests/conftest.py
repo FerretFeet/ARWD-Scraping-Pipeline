@@ -103,3 +103,25 @@ def transformer_input_fixture(request) -> dict:
         "fixture_val": fixture_val,
         "expected_error": expected_error,
     }
+
+
+@pytest.fixture
+def validator_input_fixture(request) -> dict:
+    """Takes params in this shape:
+
+    (name, variant, transformer_class)"""
+    name, variant, expected_error = request.param
+
+    filename = f"validate/{name}.{variant}.json"
+    fp = FIXTURE_DIR / filename
+    if not (fp.exists()):
+        msg = f"File not found for validator test: {fp}"
+        raise FileNotFoundError(msg)
+    fixture_val = load_json(fp)
+    return {
+        "path": filename,
+        "filename": filename,
+        "variant": variant,
+        "fixture_val": fixture_val,
+        "expected_error": expected_error,
+    }

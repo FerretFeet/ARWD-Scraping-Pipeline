@@ -1,4 +1,4 @@
-"""pipeline function for transforming content."""
+"""pipeline class for transforming content."""
 
 import html
 
