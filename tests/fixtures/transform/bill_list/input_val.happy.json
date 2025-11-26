@@ -1,0 +1,8 @@
+{
+  "base_url": "str",
+  "rel_url": "str",
+  "chamber": "str",
+  "session": "str",
+  "bill_url": "str",
+  "next_page": "str"
+}

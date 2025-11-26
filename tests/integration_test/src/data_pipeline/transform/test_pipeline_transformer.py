@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
@@ -33,7 +35,7 @@ def test_pipeline_transformer_expected_output(transformer_info, transformer_inpu
     ), f"Transformer {type(transformer)} returned None from input {input_val}"
     assert len(result) >= len(input_val)
     for val in result.values():
-        assert isinstance(val, (str, list, int, float)) or val is None, (
+        assert isinstance(val, (str, list, int, float, datetime)) or val is None, (
             f"Transformer"
             f" {type(transformer)} returned unexpected val type, "
             f"{type(val)}, from input {input_val}"

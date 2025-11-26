@@ -1,5 +1,7 @@
 """Integration test start with html, into extract_parse_content, into transformer"""
 
+from datetime import datetime
+
 import pytest
 
 from src.data_pipeline.extract.webcrawler import Crawler
@@ -13,9 +15,6 @@ param_list = [
 ]
 
 
-@pytest.mark.xfail(
-    reason="Not all transformers yet implemented",
-)  # Until all selectors have a transformer
 @pytest.mark.parametrize(
     ("selector_info", "html_selector_fixture"),
     param_list,
@@ -41,4 +40,4 @@ def test_extract_to_transform_expected_output(selector_info, html_selector_fixtu
 
     assert len(transformed_result) >= len(extraction_result)
     for val in transformed_result.values():
-        assert isinstance(val, (str, int, float, list)) or val is None
+        assert isinstance(val, (str, int, float, list, datetime)) or val is None

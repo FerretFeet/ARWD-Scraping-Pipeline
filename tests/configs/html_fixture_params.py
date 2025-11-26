@@ -52,7 +52,7 @@ BILL_LIST_FIXTURE_PARAMS = [
     ),
     (
         "bill_list_page/bill_list",
-        "https://www.arkleg.state.ar.us/Bills/ViewBills?&type=HB&ddBienniumSession=2017%2F2017R",
+        "view-source:https://arkleg.state.ar.us/Bills/ViewBills?start=40&type=HB&ddBienniumSession=2025%2F2025R#SearchResults",
         "v2",
     ),
     (

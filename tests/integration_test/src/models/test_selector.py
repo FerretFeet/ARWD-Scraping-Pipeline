@@ -33,7 +33,6 @@ def test_selector_expected_output(selector_info, html_selector_fixture):
 
     keys = ["rel_url"]
     keys.extend(str(key) for key in selector.selectors)
-
     for key in keys:
         assert key in result
         if key in required_keys:

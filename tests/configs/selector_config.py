@@ -24,6 +24,15 @@ from src.data_pipeline.extract.selector_templates.arkleg.legislator_list_selecto
 from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
+from src.data_pipeline.transform.templates.arkleg.bill_category_transformer import (
+    BillCategoryTransformer,
+)
+from src.data_pipeline.transform.templates.arkleg.bill_list_transformer import BillListTransformer
+from src.data_pipeline.transform.templates.arkleg.bill_transformer import BillTransformer
+from src.data_pipeline.transform.templates.arkleg.bill_vote_transformer import BillVoteTransformer
+from src.data_pipeline.transform.templates.arkleg.legislator_list_transformer import (
+    LegislatorListTransformer,
+)
 from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
     LegislatorTransformer,
 )
@@ -47,16 +56,19 @@ SELECTOR_TESTS = [
         "selector_class": LegislatorListSelector,
         "fixture_params": LEGISLATOR_LIST_PARAMS,
         "required_keys": ["legislator_link"],
+        "transformer_dict": LegislatorListTransformer,
     },
     {
         "selector_class": BillCategorySelector,
         "fixture_params": BILL_CATEGORY_FIXTURE_PARAMS,
         "required_keys": ["bill_cat_link"],
+        "transformer_dict": BillCategoryTransformer,
     },
     {
         "selector_class": BillListSelector,
         "fixture_params": BILL_LIST_FIXTURE_PARAMS,
         "required_keys": ["chamber", "session", "bill_url"],
+        "transformer_dict": BillListTransformer,
     },
     {
         "selector_class": BillSelector,
@@ -69,11 +81,13 @@ SELECTOR_TESTS = [
             "lead_sponsor",
             "intro_date",
         ],
+        "transformer_dict": BillTransformer,
     },
     {
         "selector_class": BillVoteSelector,
         "fixture_params": VOTE_PAGE_FIXTURE_PARAMS,
         "required_keys": ["title"],
+        "transformer_dict": BillVoteTransformer,
     },
     # Add other selectors here...
 ]

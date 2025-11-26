@@ -1,0 +1,8 @@
+{
+  "base_url": "www.example.com/",
+  "rel_url": "extension/",
+  "legislator_link": [
+    "legislator1",
+    "legislator2"
+  ]
+}

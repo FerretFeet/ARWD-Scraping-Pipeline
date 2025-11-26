@@ -31,3 +31,48 @@ LEG_TRANSFORM_PATHS = {
         None,
     ),
 }
+
+leg_list_input_val = "leg_list/input_val"
+LEG_LIST_TRANSFORM_PATHS = {
+    (
+        leg_list_input_val,
+        "happy",
+        None,
+    ),
+}
+
+bill_cat_input_val = "bill_cat/input_val"
+BILL_CAT_TRANSFORM_PATHS = {
+    (
+        bill_cat_input_val,
+        "happy",
+        None,
+    ),
+}
+
+bill_list_input_val = "bill_list/input_val"
+BILL_LIST_TRANSFORM_PATHS = {
+    (
+        bill_list_input_val,
+        "happy",
+        None,
+    ),
+}
+
+bill_input_val = "bill/input_val"
+BILL_TRANSFORM_PATHS = {
+    (
+        bill_input_val,
+        "happy",
+        None,
+    ),
+}
+
+bill_vote_input_val = "bill_vote/input_val"
+BILL_VOTE_TRANSFORM_PATHS = {
+    (
+        bill_vote_input_val,
+        "happy",
+        None,
+    ),
+}
