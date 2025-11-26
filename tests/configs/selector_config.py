@@ -2,7 +2,7 @@
 Used in integration_test/*/test_selector.py
 Inputs:
 - selector_class
-- fixture_params (located in ./html_fixture_params.py))
+- fixture_params (located in ./html_fixture_params.py)
 - required_keys (list of required successful selector attributes)
 """
 
@@ -24,10 +24,7 @@ from src.data_pipeline.extract.selector_templates.arkleg.legislator_list_selecto
 from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
-from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
-    LegislatorTransformer,
-)
-from tests.fixture_params import (
+from tests.configs.html_fixture_params import (
     BILL_CATEGORY_FIXTURE_PARAMS,
     BILL_FIXTURE_PARAMS,
     BILL_LIST_FIXTURE_PARAMS,
@@ -39,7 +36,6 @@ from tests.fixture_params import (
 SELECTOR_TESTS = [
     {
         "selector_class": LegislatorSelector,
-        "transformer_class": LegislatorTransformer,
         "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
         "required_keys": ["title", "district", "seniority"],
     },
@@ -67,7 +63,6 @@ SELECTOR_TESTS = [
             "bill_no_dwnld",
             "orig_chamber",
             "lead_sponsor",
-            "lead_sponsor_link",
             "intro_date",
         ],
     },

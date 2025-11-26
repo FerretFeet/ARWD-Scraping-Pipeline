@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,7 +21,7 @@ def pytest_addoption(parser):
     )
 
 
-FIXTURE_DIR = Path(__file__).parent / "fixtures" / "html"
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
 def download_fixture(url: str, path: Path):
@@ -52,7 +53,7 @@ def html_selector_fixture(request):
     force_refresh = request.config.getoption("--refresh-html-fixtures")
 
     # Example: name="bill_page/bill", variant="v1"
-    filename = f"{name}.{variant}.html"
+    filename = f"html/{name}.{variant}.html"
     fp = FIXTURE_DIR / filename
 
     # Download if needed
@@ -72,3 +73,32 @@ def html_selector_fixture(request):
             "url": url,
             "variant": variant,
         }
+
+
+######################################
+# Return Transformation Input
+######################################
+def load_json(path: Path) -> dict:
+    with path.open() as f:
+        return json.load(f)
+
+
+@pytest.fixture
+def transformer_input_fixture(request) -> dict:
+    """Takes params in this shape:
+
+    (name, variant, transformer_class)"""
+    name, variant = request.param
+
+    filename = f"transform/{name}.{variant}.json"
+    fp = FIXTURE_DIR / filename
+    if not (fp.exists()):
+        msg = f"File not found for transformer test: {fp}"
+        raise FileNotFoundError(msg)
+    fixture_val = load_json(fp)
+    return {
+        "path": filename,
+        "filename": filename,
+        "variant": variant,
+        "fixture_val": fixture_val,
+    }

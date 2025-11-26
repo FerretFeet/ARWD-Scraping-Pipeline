@@ -5,7 +5,7 @@ SELECTORS_TESTS is a config object for
 from pathlib import Path
 
 from src.utils.paths import project_root
-from tests.selector_config import SELECTOR_TESTS
+from tests.configs.selector_config import SELECTOR_TESTS
 
 SELECTORS_DIR = (
     project_root / "src" / "data_pipeline" / "extract" / "selector_templates"

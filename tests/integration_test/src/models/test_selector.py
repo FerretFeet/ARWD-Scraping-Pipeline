@@ -1,7 +1,7 @@
 import pytest
 
 from src.data_pipeline.extract.webcrawler import Crawler
-from tests.selector_config import SELECTOR_TESTS
+from tests.configs.selector_config import SELECTOR_TESTS
 
 # Flatten selector + fixture param combinations
 
@@ -15,7 +15,7 @@ param_list = [
 @pytest.mark.parametrize(
     ("selector_info", "html_selector_fixture"),
     param_list,
-    indirect=["html_selector_fixture"],  # <-- tell pytest this param is for a fixture
+    indirect=["html_selector_fixture"],
 )
 def test_selector_success_all(selector_info, html_selector_fixture):
     """Generalized tests for all selectors."""
