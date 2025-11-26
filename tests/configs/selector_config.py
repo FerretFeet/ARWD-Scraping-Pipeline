@@ -36,6 +36,8 @@ from src.data_pipeline.transform.templates.arkleg.legislator_list_transformer im
 from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
     LegislatorTransformer,
 )
+from src.data_pipeline.validate.models.arkleg.bill_category import BillCategoryValidator
+from src.data_pipeline.validate.models.arkleg.bill_list import BillListValidator
 from tests.configs.html_fixture_params import (
     BILL_CATEGORY_FIXTURE_PARAMS,
     BILL_FIXTURE_PARAMS,
@@ -63,12 +65,14 @@ SELECTOR_TESTS = [
         "fixture_params": BILL_CATEGORY_FIXTURE_PARAMS,
         "required_keys": ["bill_cat_link"],
         "transformer_dict": BillCategoryTransformer,
+        "validator_cls": BillCategoryValidator,
     },
     {
         "selector_class": BillListSelector,
         "fixture_params": BILL_LIST_FIXTURE_PARAMS,
         "required_keys": ["chamber", "session", "bill_url"],
         "transformer_dict": BillListTransformer,
+        "validator_cls": BillListValidator,
     },
     {
         "selector_class": BillSelector,

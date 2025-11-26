@@ -1,6 +1,6 @@
 import pytest
 
-from src.data_pipeline.validate.models.utils.validate_path_str import validate_path_str
+from src.data_pipeline.validate.utils.validate_path_str import validate_path_str
 
 
 def test_validate_path_success():

@@ -2,30 +2,13 @@
 
 from pydantic import BaseModel
 
-from src.data_pipeline.validate.models.utils.validate_path_str import PathString
-from src.data_pipeline.validate.models.utils.validate_url_str import HttpUrlString
+from src.data_pipeline.validate.utils.validate_path_str import PathString
+from src.data_pipeline.validate.utils.validate_url_str import BaseHttpUrlString
 
 
 class BillCategoryValidator(BaseModel):
     """Bill category validator."""
 
-    base_url: HttpUrlString
+    base_url: BaseHttpUrlString
     rel_url: PathString
     bill_cat_link: list[PathString]
-
-    def __post_init__(self) -> None:
-        """Post initialization."""
-        error_msg = None
-        if not self.base_url.startswith("http"):
-            error_msg = "base_url must start with http"
-            raise ValueError(error_msg)
-        if self.base_url.endswith("/"):
-            error_msg = "base_url must not end with /"
-            raise ValueError(error_msg)
-        if not self.rel_url.startswith("/"):
-            error_msg = "rel_url must start with http"
-            raise ValueError(error_msg)
-        for item in self.bill_cat_link:
-            if not item.startswith("/"):
-                error_msg = "bill_cat_link must start with /"
-                raise ValueError(error_msg)

@@ -20,4 +20,4 @@ def validate_base_url(v: str) -> str:
     return v
 
 
-HttpUrlString = Annotated[str, AfterValidator(validate_base_url)]
+BaseHttpUrlString = Annotated[str, AfterValidator(validate_base_url)]

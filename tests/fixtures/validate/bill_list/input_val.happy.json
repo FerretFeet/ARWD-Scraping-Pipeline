@@ -1,9 +1,7 @@
 {
   "base_url": "https://example.com",
   "rel_url": "/bills",
-  "chamber": [
-    "house"
-  ],
+  "chamber": "house",
   "session": "2025",
   "bill_url": [
     "https://example.com/bill/123",

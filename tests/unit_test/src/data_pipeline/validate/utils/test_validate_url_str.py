@@ -1,6 +1,6 @@
 import pytest
 
-from src.data_pipeline.validate.models.utils.validate_url_str import validate_base_url
+from src.data_pipeline.validate.utils.validate_url_str import validate_base_url
 
 
 def test_validate_base_url_success():
