@@ -1,9 +1,10 @@
 """Validator for bill category transformer."""
 
-from pydantic import BaseModel
+from pydantic.dataclasses import dataclass
 
 
-class BillCategoryValidator(BaseModel):
+@dataclass
+class BillCategoryValidator:
     """Bill category validator."""
 
     base_url: str

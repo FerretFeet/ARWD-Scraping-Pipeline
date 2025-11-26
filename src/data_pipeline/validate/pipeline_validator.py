@@ -1,8 +1,11 @@
 """Pipeline class for validating content."""
 
-from pydantic import BaseModel
+from dataclasses import asdict
+
+from pydantic import BaseModel, ValidationError
 
 from src.config.settings import config
+from src.utils.logger import logger
 
 
 class PipelineValidator:
@@ -23,5 +26,10 @@ class PipelineValidator:
         Each model should have a key to match each content key
 
         """
-        validated = val_model.model_validate(unval_content)
-        return validated.model_dump()
+        try:
+            validated = val_model(**unval_content)
+            return asdict(validated)
+        except ValidationError as err:
+            msg = f"Validation error for {val_model.__name__}: {err}"
+            logger.error(msg)
+            raise ValueError(msg) from err

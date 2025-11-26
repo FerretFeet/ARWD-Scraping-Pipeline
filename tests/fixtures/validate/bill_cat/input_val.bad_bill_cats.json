@@ -1,0 +1,8 @@
+{
+  "base_url": "https://example.com",
+  "rel_url": "/bills",
+  "bill_cat_link": [
+    "cat1",
+    "/cat2"
+  ]
+}

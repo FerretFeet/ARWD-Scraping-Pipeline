@@ -1,9 +1,9 @@
 {
-  "base_url": "string",
+  "base_url": "http:string",
   "rel_url": [
-    "str"
+    "/str"
   ],
   "bill_cat_link": [
-    "str"
+    "/str"
   ]
 }

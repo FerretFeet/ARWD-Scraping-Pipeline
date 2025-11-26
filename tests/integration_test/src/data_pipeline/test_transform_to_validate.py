@@ -1,10 +1,13 @@
 """Integration test start with html, into extract_parse_content, into transformer"""
 
 import pytest
+from pydantic_core._pydantic_core import ValidationError
 
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
 from src.data_pipeline.validate.pipeline_validator import PipelineValidator
 from tests.configs.transformer_config import TRANSFORMER_TESTS
+
+__POSSIBLE_ERRORS = [ValidationError]
 
 param_list = [
     (_transformer_info, param)
@@ -19,16 +22,22 @@ param_list = [
     param_list,
     indirect=["transformer_input_fixture"],
 )
-def test_extract_to_transform_expected_output(transformer_info, transformer_input_fixture):
+def test_transform_to_validate_expected_output(transformer_info, transformer_input_fixture):
     """Generalized tests for all selectors."""
     input_val = transformer_input_fixture["fixture_val"]
     transformer = transformer_info["transformer_dict"]
     validator_cls = transformer_info["validator_cls"]
 
+    expected_error = transformer_input_fixture["expected_error"]
+
     pipeline_transformer = PipelineTransformer()
     pipeline_validator = PipelineValidator()
 
     transformed = pipeline_transformer.transform_content(transformer, input_val)
+    if expected_error:
+        with pytest.raises(ValueError, match="Validation Error for"):
+            pipeline_validator.validate(validator_cls, transformed)
+        return
     validator_result = pipeline_validator.validate(validator_cls, transformed)
 
     assert validator_result is not None
