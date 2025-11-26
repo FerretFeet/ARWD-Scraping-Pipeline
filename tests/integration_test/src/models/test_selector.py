@@ -29,6 +29,7 @@ def test_selector_success_all(selector_info, html_selector_fixture):
 
     result = crawler.get_content(selector, filename)
     assert result is not None
+    assert len(result.keys()) >= len(selector.selectors.keys())
 
     keys = ["rel_url"]
     keys.extend(str(key) for key in selector.selectors)

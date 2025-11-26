@@ -8,6 +8,9 @@ from bs4 import BeautifulSoup
 from src.data_pipeline.extract.webcrawler import Crawler
 
 
+###########################################
+# RETURN OR DOWNLOAD HTML FIXTURE
+###########################################
 def pytest_addoption(parser):
     parser.addoption(
         "--refresh-html-fixtures",
@@ -51,17 +54,16 @@ def html_selector_fixture(request):
     # Example: name="bill_page/bill", variant="v1"
     filename = f"{name}.{variant}.html"
     fp = FIXTURE_DIR / filename
-    fp.parent.mkdir(parents=True, exist_ok=True)
 
     # Download if needed
     if force_refresh or not fp.exists():
+        fp.parent.mkdir(parents=True, exist_ok=True)
         download_fixture(url, fp)
 
     # Load into BeautifulSoup
     html_content = fp.read_text(encoding="utf-8")
     soup = BeautifulSoup(html_content, "html.parser")
 
-    # Patch crawler.get_page for this tests only
     with patch.object(Crawler, "get_page", return_value=soup):
         yield {
             "soup": soup,

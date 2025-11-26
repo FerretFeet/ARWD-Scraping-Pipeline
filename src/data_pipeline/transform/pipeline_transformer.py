@@ -29,14 +29,15 @@ class PipelineTransformer:
         transformed_content = {}
         failed_keys = []
         for key, value in content.items():
-            if value is None:
-                continue
             if key not in template:
                 msg = f"Key {key} not in template"
                 logger.error(msg)
                 failed_keys.append(key)
                 if self.strict:
                     raise KeyError(msg)
+                continue
+            if value is None:
+                transformed_content[key] = value
                 continue
 
             if isinstance(value, list):

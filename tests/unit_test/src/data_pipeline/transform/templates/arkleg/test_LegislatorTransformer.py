@@ -72,6 +72,7 @@ output_val = {
     "l_name": "bledsoe",
     "chamber": "senate",
     "phone": None,
+    "email": None,
     "address": "709 sky mountain dr., rogers, 72757",
     "district": 3,
     "seniority": 1,
