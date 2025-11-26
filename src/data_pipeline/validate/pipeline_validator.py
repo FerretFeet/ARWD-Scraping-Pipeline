@@ -1,7 +1,5 @@
 """Pipeline class for validating content."""
 
-from dataclasses import asdict
-
 from pydantic import BaseModel, ValidationError
 
 from src.config.settings import config
@@ -27,8 +25,8 @@ class PipelineValidator:
 
         """
         try:
-            validated = val_model(**unval_content)
-            return asdict(validated)
+            validated = val_model.model_validate(unval_content)
+            return validated.model_dump()
         except ValidationError as err:
             msg = f"Validation error for {val_model.__name__}: {err}"
             logger.error(msg)

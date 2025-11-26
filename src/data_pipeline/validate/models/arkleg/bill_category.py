@@ -1,15 +1,17 @@
 """Validator for bill category transformer."""
 
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
+
+from src.data_pipeline.validate.models.utils.validate_path_str import PathString
+from src.data_pipeline.validate.models.utils.validate_url_str import HttpUrlString
 
 
-@dataclass
-class BillCategoryValidator:
+class BillCategoryValidator(BaseModel):
     """Bill category validator."""
 
-    base_url: str
-    rel_url: str
-    bill_cat_link: list[str]
+    base_url: HttpUrlString
+    rel_url: PathString
+    bill_cat_link: list[PathString]
 
     def __post_init__(self) -> None:
         """Post initialization."""
