@@ -24,6 +24,9 @@ from src.data_pipeline.extract.selector_templates.arkleg.legislator_list_selecto
 from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
+from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
+    LegislatorTransformer,
+)
 from tests.configs.html_fixture_params import (
     BILL_CATEGORY_FIXTURE_PARAMS,
     BILL_FIXTURE_PARAMS,
@@ -38,6 +41,7 @@ SELECTOR_TESTS = [
         "selector_class": LegislatorSelector,
         "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
         "required_keys": ["title", "district", "seniority"],
+        "transformer_dict": LegislatorTransformer,
     },
     {
         "selector_class": LegislatorListSelector,

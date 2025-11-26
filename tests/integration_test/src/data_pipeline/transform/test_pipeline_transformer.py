@@ -15,7 +15,7 @@ param_list = [
     param_list,
     indirect=["transformer_input_fixture"],
 )
-def test_pipeline_transformer(transformer_info, transformer_input_fixture):
+def test_pipeline_transformer_expected_output(transformer_info, transformer_input_fixture):
     """Generalized tests for all transformers"""
     input_val = transformer_input_fixture["fixture_val"]
     transformer = transformer_info["transformer_dict"]

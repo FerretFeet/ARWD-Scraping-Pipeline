@@ -17,7 +17,7 @@ param_list = [
     param_list,
     indirect=["html_selector_fixture"],
 )
-def test_selector_success_all(selector_info, html_selector_fixture):
+def test_selector_expected_output(selector_info, html_selector_fixture):
     """Generalized tests for all selectors."""
     filename = html_selector_fixture["filename"]
 
