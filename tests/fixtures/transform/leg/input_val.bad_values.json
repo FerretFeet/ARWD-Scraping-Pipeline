@@ -1,0 +1,33 @@
+{
+  "title": 123,
+  "phone": 3.14159,
+  "email": {
+    "key": "value"
+  },
+  "address": [
+    "tuple",
+    "of",
+    "strings"
+  ],
+  "district": true,
+  "seniority": [
+    1,
+    2,
+    3
+  ],
+  "public_service": false,
+  "committees": 9999,
+  "committee_links": {
+    "a": 1,
+    "b": 2
+  },
+  "rel_url": [
+    10.5,
+    20.5
+  ],
+  "base_url": {
+    "nested": {
+      "dict": "yes"
+    }
+  }
+}

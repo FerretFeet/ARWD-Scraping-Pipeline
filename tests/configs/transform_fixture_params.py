@@ -8,9 +8,26 @@ Inputs
 
 """
 
+leg_input_val = "leg/input_val"
 LEG_TRANSFORM_PATHS = {
     (
-        "leg/input_val",
+        leg_input_val,
         "happy",
+        None,
+    ),
+    (
+        leg_input_val,
+        "bad_values",
+        None,
+    ),
+    (
+        leg_input_val,
+        "extra_keys",
+        KeyError,
+    ),
+    (
+        leg_input_val,
+        "missing_keys",
+        None,
     ),
 }

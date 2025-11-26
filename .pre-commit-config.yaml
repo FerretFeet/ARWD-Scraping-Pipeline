@@ -17,3 +17,15 @@ repos:
     hooks:
       - id: bandit
         args: [ "-c", "pyproject.toml", "-r" ]
+  # Pytest protect against commiting broken code
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest check
+        entry: pytest
+        language: system
+        types: [ python ]
+        # Files to look for changes in to trigger the test run
+        files: '\.(py)$'
+        # Specify additional arguments, e.g., to run only fast tests or skip coverage
+        args: [ "--strict-markers" ]

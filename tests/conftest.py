@@ -88,7 +88,7 @@ def transformer_input_fixture(request) -> dict:
     """Takes params in this shape:
 
     (name, variant, transformer_class)"""
-    name, variant = request.param
+    name, variant, expected_error = request.param
 
     filename = f"transform/{name}.{variant}.json"
     fp = FIXTURE_DIR / filename
@@ -101,4 +101,5 @@ def transformer_input_fixture(request) -> dict:
         "filename": filename,
         "variant": variant,
         "fixture_val": fixture_val,
+        "expected_error": expected_error,
     }

@@ -41,9 +41,9 @@ class PipelineTransformer:
                 continue
 
             if isinstance(value, list):
-                new_value = [html.unescape(v) for v in value]
+                new_value = [html.unescape(str(v)) for v in value]
             else:
-                new_value = html.unescape(value)
+                new_value = html.unescape(str(value))
 
             transform_func = template[key]
 

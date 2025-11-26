@@ -21,6 +21,11 @@ def test_pipeline_transformer_expected_output(transformer_info, transformer_inpu
     transformer = transformer_info["transformer_dict"]
 
     pipeline_transformer = PipelineTransformer()
+    expected_error = transformer_input_fixture["expected_error"]
+    if expected_error is not None:
+        with pytest.raises(expected_error):
+            pipeline_transformer.transform_content(transformer, input_val)
+        return
     result = pipeline_transformer.transform_content(transformer, input_val)
 
     assert (

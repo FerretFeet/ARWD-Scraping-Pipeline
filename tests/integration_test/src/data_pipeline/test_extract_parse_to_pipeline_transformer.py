@@ -32,6 +32,7 @@ def test_extract_to_transform_expected_output(selector_info, html_selector_fixtu
     crawler = Crawler("")
 
     extraction_result = crawler.get_content(selector, filename)
+
     assert extraction_result is not None
 
     transformer = PipelineTransformer()

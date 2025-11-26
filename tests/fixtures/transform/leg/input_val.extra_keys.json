@@ -1,0 +1,33 @@
+{
+  "title": "simple string",
+  "phone": null,
+  "email": [
+    "single string list"
+  ],
+  "second_email": [
+    "single string list"
+  ],
+  "address": null,
+  "second_address": null,
+  "district": [
+    "single string list"
+  ],
+  "seniority": [
+    "single string list"
+  ],
+  "public_service": [
+    "single string list"
+  ],
+  "committees": [
+    "multi",
+    "string",
+    "list"
+  ],
+  "committee_links": [
+    "multi",
+    "string",
+    "list"
+  ],
+  "rel_url": "str",
+  "base_url": "str"
+}
