@@ -4,7 +4,7 @@ from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
 
 fake_content = {"text": "SHOULD CONVERT TO LOWERCASE"}
 
-fake_template = {"text": lambda val: {"text": val.lower()}}
+fake_template = {"text": lambda val, *, strict: {"text": val.lower()}}  # noqa: ARG005
 
 
 class TestTransformContent:
@@ -28,5 +28,6 @@ class TestTransformContent:
         """
         bad_template = {"text": bad_transformer}
         transformer = PipelineTransformer(strict=True)
+
         with pytest.raises(TypeError):
             transformer.transform_content(bad_template, fake_content)

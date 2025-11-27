@@ -17,10 +17,6 @@
   ],
   "public_service": false,
   "committees": 9999,
-  "committee_links": {
-    "a": 1,
-    "b": 2
-  },
   "rel_url": [
     10.5,
     20.5

@@ -18,23 +18,26 @@
     "House"
   ],
   "lead_sponsor": [
-    "House Management"
-  ],
-  "lead_sponsor_link": [
-    "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"
+    [
+      "House Management",
+      "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"
+    ]
   ],
   "other_primary_sponsor": [
-    "House Management",
-    "House Management",
-    "House Management"
+    [
+      "House Management",
+      "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"
+    ],
+    [
+      "House Management",
+      "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"
+    ],
+    [
+      "House Management",
+      "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"
+    ]
   ],
-  "other_primary_sponsor_link": [
-    "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R",
-    "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R",
-    "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"
-  ],
-  "cosponsors": "None",
-  "cosponsors_link": "None",
+  "cosponsors": null,
   "intro_date": [
     "1/13/2025\\xa02:39:05 PM"
   ],

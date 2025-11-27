@@ -18,7 +18,7 @@ LEG_TRANSFORM_PATHS = {
     (
         leg_input_val,
         "bad_values",
-        None,
+        ValueError,
     ),
     (
         leg_input_val,

@@ -82,7 +82,7 @@ class Crawler:
         template: SelectorTemplate,
         path: str,
         session: Session = None,
-    ) -> dict[str, str | list[str] | None]:
+    ) -> dict[str, str | list[str] | None | dict[str, str | list[str] | None]]:
         """
         Request a page and return the parsed content.
 

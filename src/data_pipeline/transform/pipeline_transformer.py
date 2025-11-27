@@ -13,7 +13,13 @@ class PipelineTransformer:
         """Initialize the transformer with strict flag."""
         self.strict: bool = config["strict"] if strict is None else strict
 
-    def transform_content(self, template: dict, content: dict) -> dict:  # noqa: C901, PLR0912
+    def transform_content(  # noqa: C901, PLR0912
+        self,
+        template: dict,
+        content: dict,
+        *,
+        strict: bool = False,
+    ) -> dict:
         """
         Pipeline function for transforming content.
 
@@ -21,6 +27,7 @@ class PipelineTransformer:
             template (dict): template holding transform functions for each possible expected
                 content.key
             content (dict): content to be transformed
+            strict: whether to raise recoverable errors or not
 
         Returns:
             dict: transformed content
@@ -39,9 +46,10 @@ class PipelineTransformer:
             if value is None:
                 transformed_content[key] = value
                 continue
-
             if isinstance(value, list):
-                new_value = [html.unescape(str(v)) for v in value]
+                new_value = (
+                    [html.unescape(str(v)) for v in value] if not isinstance(value, list) else value
+                )
             else:
                 new_value = html.unescape(str(value))
 
@@ -55,7 +63,8 @@ class PipelineTransformer:
                 raise TypeError(msg)
 
             try:
-                transformed_val = transform_func(new_value)
+
+                transformed_val = transform_func(new_value, strict=strict)
 
                 if isinstance(transformed_val, dict):
                     transformed_content.update(transformed_val)

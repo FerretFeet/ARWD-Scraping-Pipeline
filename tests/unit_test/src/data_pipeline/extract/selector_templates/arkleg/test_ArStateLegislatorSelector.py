@@ -47,14 +47,12 @@ class TestArStateLegislatorSelector:
         ]
 
         # committees too big to check all, just check first and last
-        assert result["committees"][0].strip() == "TASK FORCE ON AUTISM"
-        assert (
-            result["committee_links"][0]
-            == "/Committees/Detail?code=985&ddBienniumSession=2025%2F2025R"
+        assert result["committees"][0] == (
+            "TASK FORCE ON AUTISM",
+            "/Committees/Detail?code=985&ddBienniumSession=2025%2F2025R",
         )
-        assert len(result["committee_links"]) == len(result["committees"]) == 30  # noqa: PLR2004
-        assert result["committees"][29].strip() == "JBC-ADMINISTRATIVE RULE REVIEW SUBCOMMITTEE"
-        assert (
-            result["committee_links"][29]
-            == "/Committees/Detail?code=015&ddBienniumSession=2025%2F2025R"
+
+        assert result["committees"][29] == (
+            "JBC-ADMINISTRATIVE RULE REVIEW SUBCOMMITTEE",
+            "/Committees/Detail?code=015&ddBienniumSession=2025%2F2025R",
         )

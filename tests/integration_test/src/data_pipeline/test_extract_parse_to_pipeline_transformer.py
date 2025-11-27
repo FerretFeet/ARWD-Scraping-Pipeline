@@ -20,7 +20,7 @@ param_list = [
     param_list,
     indirect=["html_selector_fixture"],
 )
-def test_extract_to_transform_expected_output(selector_info, html_selector_fixture):
+def test_extract_parse_to_transform_expected_output(selector_info, html_selector_fixture):
     """Generalized tests for all selectors."""
     filename = html_selector_fixture["filename"]
 
@@ -34,10 +34,10 @@ def test_extract_to_transform_expected_output(selector_info, html_selector_fixtu
 
     assert extraction_result is not None
 
-    transformer = PipelineTransformer()
+    transformer = PipelineTransformer(strict=True)
     transformed_result = transformer.transform_content(transformer_dict, extraction_result)
     assert transformed_result is not None
 
     assert len(transformed_result) >= len(extraction_result)
     for val in transformed_result.values():
-        assert isinstance(val, (str, int, float, list, datetime)) or val is None
+        assert isinstance(val, (str, int, float, list, datetime, tuple)) or val is None

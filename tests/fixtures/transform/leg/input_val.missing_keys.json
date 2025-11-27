@@ -11,10 +11,19 @@
   "public_service": [
     "single string list"
   ],
-  "committee_links": [
-    "multi",
-    "string",
-    "list"
+  "committees": [
+    [
+      "multi",
+      "multi"
+    ],
+    [
+      "string",
+      "multi"
+    ],
+    [
+      "list",
+      "multi"
+    ]
   ],
   "rel_url": "str",
   "base_url": "str"

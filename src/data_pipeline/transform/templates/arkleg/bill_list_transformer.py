@@ -7,7 +7,9 @@ from src.models.transformer_template import TransformerTemplate
 BillListTransformer: TransformerTemplate = {
     "base_url": empty_transform,
     "rel_url": empty_transform,
-    "chamber": lambda chamber: (normalize_str(chamber).replace("bills", "")),
+    "chamber": lambda chamber, *, strict: (
+        normalize_str(chamber, strict=strict, remove_substr="bills")
+    ),
     "session": empty_transform,
     "bill_url": empty_transform,
     "next_page": empty_transform,

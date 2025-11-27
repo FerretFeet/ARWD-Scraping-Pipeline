@@ -19,9 +19,18 @@
     "single string list"
   ],
   "committees": [
-    "multi",
-    "string",
-    "list"
+    [
+      "multi",
+      "multi"
+    ],
+    [
+      "string",
+      "multi"
+    ],
+    [
+      "list",
+      "multi"
+    ]
   ],
   "committee_links": [
     "multi",

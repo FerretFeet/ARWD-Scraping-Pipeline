@@ -15,14 +15,18 @@
     "single string list"
   ],
   "committees": [
-    "multi",
-    "string",
-    "list"
-  ],
-  "committee_links": [
-    "multi",
-    "string",
-    "list"
+    [
+      "multi",
+      "multi"
+    ],
+    [
+      "string",
+      "multi"
+    ],
+    [
+      "list",
+      "multi"
+    ]
   ],
   "rel_url": "str",
   "base_url": "str"

@@ -23,16 +23,22 @@ class LegislatorSelector(SelectorTemplate):
                 "district": _LegislatorParsers.parse_district,
                 "seniority": _LegislatorParsers.parse_seniority,
                 "public_service": _LegislatorParsers.parse_public_service,
-                "committees": ("div#meetingBodyWrapper a"),  # NEED TO SCRAPE COMMITTEES TOO
-                "committee_links": (
-                    "div#meetingBodyWrapper a",
-                    "href",
-                ),  # NEED TO SCRAPE COMMITTEES TOO
+                "committees": _LegislatorParsers.get_committees_names_links,
             },
         )
 
 
 class _LegislatorParsers:
+    @staticmethod
+    def get_committees_names_links(soup: BeautifulSoup) -> list[tuple[str, str]]:
+        els = soup.select("div#meetingBodyWrapper a")
+        result = []
+        for el in els:
+            el_text = el.get_text(strip=True)
+            el_link = el.get("href")
+            result.append((el_text, el_link))
+        return result
+
     @staticmethod
     def _parse_table_val(soup: BeautifulSoup, label_str: str) -> list[str] | None:
         label = re.compile(rf"^{label_str}\s*")

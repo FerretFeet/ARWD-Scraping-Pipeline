@@ -27,6 +27,7 @@ class TestArStateLegislatorSelector:
         crawler = webcrawler.Crawler("")
         rel_url = "/return/path"
         mock_get_page.return_value = known_bill_soup_fixture
+
         result = crawler.get_content(selector, rel_url)
 
         assert result is not None
@@ -34,29 +35,27 @@ class TestArStateLegislatorSelector:
         assert result["title"] == [
             "HB1001 - AN ACT FOR THE ARKANSAS HOUSE OF REPRESENTATIVES OF THE NINETY-FIFTH GENERAL ASSEMBLY APPROPRIATION FOR THE 2024-2025 FISCAL YEAR. ",
         ]
-        assert result["bill_no"] == ["PDFHB1001"]
+        assert result["bill_no"] == ["HB1001"]
         assert result["bill_no_dwnld"] == [
             "/Home/FTPDocument?path=%2FBills%2F2025R%2FPublic%2FHB1001.pdf",
         ]
-        assert result["act_no"] == ["PDF3"]
+        assert result["act_no"] == ["3"]
         assert result["act_no_dwnld"] == [
             "/Acts/FTPDocument?path=%2FACTS%2F2025R%2FPublic%2F&file=3.pdf&ddBienniumSession=2025%2F2025R",
         ]
         assert result["orig_chamber"] == ["House"]
-        assert result["lead_sponsor"] == ["House Management"]
-        assert result["lead_sponsor_link"] == [
-            "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R",
+        assert result["lead_sponsor"] == [
+            ("House Management", "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"),
         ]
-        assert result["cosponsors"] == ["Lundstrum", "C. Cooper"]
-        assert result["cosponsors_link"] == [
-            "/Legislators/Detail?member=Lundstrum&ddBienniumSession=2025%2F2025R",
-            "/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R",
+
+        assert result["cosponsors"] == [
+            ("Lundstrum", "/Legislators/Detail?member=Lundstrum&ddBienniumSession=2025%2F2025R"),
+            ("C. Cooper", "/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R"),
         ]
-        assert result["other_primary_sponsor"] == ["Lundstrum", "C. Cooper", "House Management"]
-        assert result["other_primary_sponsor_link"] == [
-            "/Legislators/Detail?member=Lundstrum&ddBienniumSession=2025%2F2025R",
-            "/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R",
-            "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R",
+        assert result["other_primary_sponsor"] == [
+            ("Lundstrum", "/Legislators/Detail?member=Lundstrum&ddBienniumSession=2025%2F2025R"),
+            ("C. Cooper", "/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R"),
+            ("House Management", "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"),
         ]
 
         assert result["intro_date"] == ["1/13/2025\xa02:39:05 PM"]

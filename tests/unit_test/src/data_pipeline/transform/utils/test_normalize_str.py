@@ -42,3 +42,9 @@ class TestNormalizeStr:
     def test_normalize_str_only_whitespace_yields_empty_string(self):
         """Ensure a string of only whitespace yields an empty string."""
         assert normalize_str(" \t\n ") == ""
+
+    def test_normalize_str_remove_substr_success(self):
+        assert normalize_str("hello world", remove_substr="hello") == "world"
+
+    def test_normalize_str_remove_substr_invalid(self):
+        assert normalize_str("hello world", remove_substr="invalid") == "hello world"

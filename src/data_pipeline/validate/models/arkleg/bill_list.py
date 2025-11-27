@@ -8,7 +8,7 @@ from src.data_pipeline.validate.utils.validate_url_str import BaseHttpUrlString
 
 
 class BillListValidator(BaseModel):
-    """Bill List validator."""
+    """arkleg Bill List validator."""
 
     base_url: BaseHttpUrlString
     rel_url: PathString
