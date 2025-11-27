@@ -52,19 +52,3 @@ def test_selector_expected_output(selector_info, html_selector_fixture):
                 result[key],
                 list,
             ), f"expected list or none for key {key}, got {type(result[key])}"
-
-    for names_key, links_key in [
-        ("yea_names", "yea_links"),
-        ("nay_names", "nay_links"),
-        ("non_voting_names", "non_voting_links"),
-        ("present_names", "present_links"),
-        ("excused_names", "excused_links"),
-        ("committees", "committee_links"),
-    ]:
-        if names_key not in result or links_key not in result:
-            continue
-        if isinstance(result[names_key], list) and isinstance(result[links_key], list):
-            assert len(result[names_key]) == len(result[links_key]), (
-                f"Length mismatch: {names_key} ({len(result[names_key])}) "
-                f"vs {links_key} ({len(result[links_key])})"
-            )

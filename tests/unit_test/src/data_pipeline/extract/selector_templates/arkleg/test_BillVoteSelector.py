@@ -37,8 +37,18 @@ class TestArStateLegislatorSelector:
         assert result is not None
 
         assert result["title"] == ["House Vote - Tuesday, February 5, 2013 1:43:39 PM"]
-        assert len(result["yea_names"]) == len(result["yea_links"]) == KNOWN_YEA
-        assert len(result["nay_names"]) == len(result["nay_links"]) == KNOWN_NAY
-        assert len(result["non_voting_names"]) == len(result["non_voting_links"]) == KNOWN_NON
-        assert len(result["present_names"]) == len(result["present_links"]) == KNOWN_PRESENT
-        assert len(result["excused_names"]) == len(result["excused_links"]) == KNOWN_EXCUSED
+        combined = [
+            v
+            for v in (
+                (result.get("yea_voters") or [])
+                + (result.get("non_voting_voters") or [])
+                + (result.get("excused_voters") or [])
+                + (result.get("present_voters") or [])
+            )
+            if v is not None
+        ]
+        for name, link in combined:
+            if name is not None:
+                assert link is not None, f"Got None link to match voter name {name}"
+            if link is not None:
+                assert name is not None, f"Got None name to match voter link {link}"

@@ -2,34 +2,41 @@
   "title": [
     "House Vote - Tuesday, February 5, 2013 1:43:39 PM"
   ],
-  "yea_names": [
-    "Alexander",
-    "D. Altes",
-    "C. Armstrong"
+  "yea_voters": [
+    [
+      "Alexander",
+      "/Legislators/Detail?member=Alexander&ddBienniumSession=2013%2F2013R"
+    ],
+    [
+      "D. Altes",
+      "/Legislators/Detail?member=D.+Altes&ddBienniumSession=2013%2F2013R"
+    ],
+    [
+      "C. Armstrong",
+      "/Legislators/Detail?member=C.+Armstrong&ddBienniumSession=2013%2F2013R"
+    ]
   ],
-  "yea_links": [
-    "/Legislators/Detail?member=Alexander&ddBienniumSession=2013%2F2013R",
-    "/Legislators/Detail?member=D.+Altes&ddBienniumSession=2013%2F2013R",
-    "/Legislators/Detail?member=C.+Armstrong&ddBienniumSession=2013%2F2013R"
+  "nay_voters": [],
+  "non_voting_voters": [
+    [
+      "Barnett",
+      "/Legislators/Detail?member=Barnett&ddBienniumSession=2013%2F2013R"
+    ],
+    [
+      "Richey",
+      "/Legislators/Detail?member=Richey&ddBienniumSession=2013%2F2013R"
+    ],
+    [
+      "Walker",
+      "/Legislators/Detail?member=Walker&ddBienniumSession=2013%2F2013R"
+    ],
+    [
+      "Mr. Speaker",
+      "/Legislators/Detail?member=Carter&ddBienniumSession=2013%2F2013R"
+    ]
   ],
-  "nay_names": [],
-  "nay_links": [],
-  "non_voting_names": [
-    "Barnett",
-    "Richey",
-    "Walker",
-    "Mr. Speaker"
-  ],
-  "non_voting_links": [
-    "/Legislators/Detail?member=Barnett&ddBienniumSession=2013%2F2013R",
-    "/Legislators/Detail?member=Richey&ddBienniumSession=2013%2F2013R",
-    "/Legislators/Detail?member=Walker&ddBienniumSession=2013%2F2013R",
-    "/Legislators/Detail?member=Carter&ddBienniumSession=2013%2F2013R"
-  ],
-  "present_names": [],
-  "present_links": [],
-  "excused_names": [],
-  "excused_links": [],
+  "present_voters": [],
+  "excused_voters": [],
   "rel_url": "html/vote_page/vote.v1.html",
   "base_url": "/stem/"
 }
