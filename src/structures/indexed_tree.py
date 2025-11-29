@@ -155,7 +155,73 @@ class IndexedTree:
         """Find node by id."""
         return self.nodes.get(node_id)
 
-    # --- Search Methods ---
+    # --- Traversal Methods ---
+
+    def reverse_in_order_traversal(self, node_id: int | None = None) -> list[Node]:
+        """
+        Perform a Reverse In-Order Traversal starting from a given node ID (defaults to root).
+
+        Return a list of nodes in the order they are visited.
+        """
+        if node_id is None:
+            node_id = self.root.id if self.root else None
+
+        if node_id is None:
+            return []
+
+        result = []
+        node = self.find_node(node_id)
+        if node is None:
+            return []
+
+        for child_id in reversed(node.children):
+            result.extend(self.reverse_in_order_traversal(child_id))
+
+        result.append(node_id)
+        return result
+
+    def preorder_traversal(self, node_id: int | None = None) -> list[Node]:
+        """
+        Perform Pre-order Traversal starting from a given node ID (defaults to root).
+
+        Return a list of nodes in the order they are visited.
+        """
+        if node_id is None:
+            node_id = self.root.id if self.root else None
+
+        if node_id is None:
+            return []
+
+        result = []
+        node = self.find_node(node_id)
+        if node is None:
+            return []
+
+        # 1. Visit Root/Current Node
+        result.append(node_id)
+
+        # 2. Recurse on Children (Left to Right, following list order)
+        for child_id in node.children:
+            result.extend(self.preorder_traversal(child_id))
+
+        return result
+
+    def find_val_ancestor(self, node_id: int, attr: str, value: str | None = None) -> Node | None:
+        """Return an ancestor with a specified .data attr or value."""
+        node = self.find_node(node_id)
+        if not node.parent:
+            return None
+
+        parent = self.find_node(node.parent)
+        target = parent.data.get(attr, None)
+
+        if target:
+            if not value:
+                return parent
+            if value and value == target:
+                return parent
+
+        return self.find_val_ancestor(parent.id, attr, value)
 
     # --- Serialization Methods ---
 

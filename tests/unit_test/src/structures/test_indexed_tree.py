@@ -6,22 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# --- MOCKING DEPENDENCY SETUP -----------------------------------------------
-# This block ensures the tests run even if 'src.utils.logger' doesn't exist.
-# It MUST run before importing the code under test.
 sys.modules["src.utils.logger"] = MagicMock()
-# ----------------------------------------------------------------------------
 
-# Assuming your class definitions are stored in 'indexed_tree.py'
 try:
     from src.structures.indexed_tree import IndexedTree, Node, PipelineStateEnum, TreeUpdateError
 except ImportError:
-    # If running as a monolithic script, you would define the classes here.
-    # For this response, assume the user handles the import path or copies classes.
     msg = "Please ensure your IndexedTree and Node classes are available for import."
     raise ImportError(msg)  # noqa: B904
-
-# --- PYTEST FIXTURES --------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
@@ -208,3 +199,128 @@ def test_load_non_existent_file(empty_tree):
     """Tests loading a file that doesn't exist raises FileNotFoundError."""
     with pytest.raises(FileNotFoundError):
         empty_tree.load_from_file(Path("non_existent_path.json"))
+
+
+@pytest.fixture
+def setup_traversal_tree(empty_tree):
+    """
+    Sets up a specific N-ary tree structure for predictable traversal testing:
+        1 (Root: 'A')
+       /|\
+      / | \
+     2  3  4
+    ('B')('C')('D')
+    """
+    # Node IDs will be 1, 2, 3, 4
+    root = Node(data={"val": "A", "type": "ROOT"})
+    empty_tree.set_root(root)
+
+    # Children added in order: 2, 3, 4 (Left to Right assumed)
+    empty_tree.add_node(parent=root.id, data={"val": "B", "type": "GROUP"})  # ID 2
+    empty_tree.add_node(parent=root.id, data={"val": "C", "type": "TASK"})  # ID 3
+    empty_tree.add_node(parent=root.id, data={"val": "D"})  # ID 4
+
+    # Add a grandchild to Node 2 (Left-most subtree)
+    empty_tree.add_node(parent=2, data={"val": "E"})  # ID 5
+
+    # Add children to Node 4 (Right-most subtree)
+    empty_tree.add_node(parent=4, data={"val": "F"})  # ID 6
+    empty_tree.add_node(parent=4, data={"val": "G", "type": "TASK"})  # ID 7
+
+    return empty_tree
+
+
+# --- TRAVERSAL TESTS --------------------------------------------------------
+
+
+def test_preorder_traversal(setup_traversal_tree):
+    """Tests Pre-order traversal (Root -> Left -> Right)."""
+    # Expected order: 1, 2, 5, 3, 4, 6, 7
+    # Traversal should go: A, B, E, C, D, F, G
+
+    visited_ids = setup_traversal_tree.preorder_traversal()
+
+    # Check all nodes are visited
+    assert len(visited_ids) == 7
+    # Check the specific order of node IDs
+    assert visited_ids == [1, 2, 5, 3, 4, 6, 7]
+
+
+def test_reverse_in_order_traversal(setup_traversal_tree):
+    """Tests Reverse In-Order traversal (Right -> Root -> Left)."""
+
+    visited_ids = setup_traversal_tree.reverse_in_order_traversal()
+
+    # Check all nodes are visited
+    assert len(visited_ids) == 7
+    # Check the specific order
+    assert visited_ids == [7, 6, 4, 3, 5, 2, 1]
+
+
+def test_traversal_from_subtree(setup_traversal_tree):
+    """Tests traversal starting from a non-root node (Node 4)."""
+    # Subtree starting at Node 4 (ID 4 is 'D'):
+
+    # Pre-order starting at 4: 4, 6, 7
+    preorder_ids = setup_traversal_tree.preorder_traversal(node_id=4)
+    assert preorder_ids == [4, 6, 7]
+
+    # Reverse In-Order starting at 4: 7, 6, 4
+    reverse_in_order_ids = setup_traversal_tree.reverse_in_order_traversal(node_id=4)
+    assert reverse_in_order_ids == [7, 6, 4]
+
+
+def test_traversal_empty_tree(empty_tree):
+    """Tests traversals on an empty tree."""
+    assert empty_tree.preorder_traversal() == []
+    assert empty_tree.reverse_in_order_traversal() == []
+
+
+# --- ANCESTOR FINDER TESTS --------------------------------------------------
+
+
+def test_find_val_ancestor_attr_exists(setup_traversal_tree):
+    """Tests finding the nearest ancestor that possesses a specific attribute."""
+    # Start at Node 5 ('E'). Should skip Node 2 ('B') and find Root 1 ('A')
+    # Node 1 data: {'val': 'A', 'type': 'ROOT'}
+    # Node 2 data: {'val': 'B', 'type': 'GROUP'}
+    # Node 5 data: {'val': 'E'}
+
+    # Starting at Node 5, look for ancestor with 'type' attribute.
+    # Parent of 5 is 2. Node 2 has 'type'.
+    ancestor = setup_traversal_tree.find_val_ancestor(5, "type")
+
+    assert ancestor is not None
+    assert ancestor.id == 2
+    assert ancestor.data["type"] == "GROUP"
+
+
+def test_find_val_ancestor_attr_and_value(setup_traversal_tree):
+    """Tests finding the nearest ancestor that possesses a specific attribute AND value."""
+    # Start at Node 7 ('G').
+    # Ancestors: 4 (no type), 1 (type='ROOT')
+
+    # Search for type == 'TASK' (only Node 3 has this, which is a sibling, not an ancestor)
+    ancestor = setup_traversal_tree.find_val_ancestor(7, "type", "TASK")
+    assert ancestor is None
+
+    # Search for type == 'ROOT' (Node 1)
+    ancestor = setup_traversal_tree.find_val_ancestor(7, "type", "ROOT")
+    assert ancestor is not None
+    assert ancestor.id == 1
+    assert ancestor.data["type"] == "ROOT"
+
+
+def test_find_val_ancestor_no_match_returns_none(setup_traversal_tree):
+    """Tests that the search continues up to the root and returns None if no match is found."""
+    # Start at Node 5. Search for 'non_existent_attr'.
+    ancestor = setup_traversal_tree.find_val_ancestor(5, "non_existent_attr")
+
+    assert ancestor is None
+
+
+def test_find_val_ancestor_start_at_root(setup_traversal_tree):
+    """Tests starting the search at the root returns None because the root has no parent."""
+    # Node 1 is the root.
+    ancestor = setup_traversal_tree.find_val_ancestor(1, "type")
+    assert ancestor is None
