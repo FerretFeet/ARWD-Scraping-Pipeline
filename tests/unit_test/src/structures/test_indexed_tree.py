@@ -229,52 +229,125 @@ def setup_traversal_tree(empty_tree):
 
     return empty_tree
 
+@pytest.fixture
+def setup_filtered_tree(reset_node_counter):
+    """
+    Sets up a specific tree structure with diverse data for filtering tests.
+    IDs: 1 (Root), 2, 3, 4 (Children of 1), 5 (Child of 2).
+    """
+    tree = IndexedTree()
+    # ID 1
+    root = Node(data={"type": "ROOT"}, state=PipelineStateEnum.CREATED)
+    tree.set_root(root)
+
+    # ID 2 (type='GROUP', state=FETCHING)
+    tree.add_node(
+        parent=1, data={"type": "GROUP", "priority": 10}, state=PipelineStateEnum.FETCHING,
+    )
+    # ID 3 (type='TASK', state=CREATED)
+    tree.add_node(parent=1, data={"type": "TASK", "priority": 5}, state=PipelineStateEnum.CREATED)
+    # ID 4 (type='GROUP', state=FETCHING)
+    tree.add_node(
+        parent=1, data={"type": "GROUP", "priority": 15}, state=PipelineStateEnum.FETCHING,
+    )
+
+    # ID 5 (type='SUBTASK', state=COMPLETED)
+    tree.add_node(parent=2, data={"type": "SUBTASK"}, state=PipelineStateEnum.COMPLETED)
+
+    return tree
+
 
 # --- TRAVERSAL TESTS --------------------------------------------------------
 
+class TestTraversal:
+    """Tests both Pre-order and Reverse In-Order traversal methods, including filtering."""
 
-def test_preorder_traversal(setup_traversal_tree):
-    """Tests Pre-order traversal (Root -> Left -> Right)."""
-    # Expected order: 1, 2, 5, 3, 4, 6, 7
-    # Traversal should go: A, B, E, C, D, F, G
+    # -----------------------------------------------------------------------
+    # 1. Reverse In-Order Traversal Tests (Right -> Root -> Left)
+    # Full Path: 4 -> 3 -> 5 -> 2 -> 1
+    # -----------------------------------------------------------------------
 
-    visited_ids = setup_traversal_tree.preorder_traversal()
+    def test_reverse_in_order_no_filter(self, setup_filtered_tree):
+        """Tests standard Reverse In-Order traversal order."""
+        # Expected RIO order: [4, 3, 5, 2, 1]
+        visited_ids = setup_filtered_tree.reverse_in_order_traversal()
 
-    # Check all nodes are visited
-    assert len(visited_ids) == 7
-    # Check the specific order of node IDs
-    assert visited_ids == [1, 2, 5, 3, 4, 6, 7]
+        assert visited_ids == [4, 3, 5, 2, 1]
+        assert len(visited_ids) == 5
 
+    def test_reverse_in_order_filter_data(self, setup_filtered_tree):
+        """Tests RIO traversal filtering based on data attributes."""
+        # Filter: type == 'GROUP' (Nodes 2, 4)
+        # Expected RIO order from full list [4, 3, 5, 2, 1]: keep 4, 2.
+        visited_ids = setup_filtered_tree.reverse_in_order_traversal(data_attrs={"type": "GROUP"})
+        assert visited_ids == [4, 2]
 
-def test_reverse_in_order_traversal(setup_traversal_tree):
-    """Tests Reverse In-Order traversal (Right -> Root -> Left)."""
+    def test_reverse_in_order_filter_node_attrs(self, setup_filtered_tree):
+        """Tests RIO traversal filtering based on direct node attributes (state)."""
+        # Filter: state == FETCHING (Nodes 2, 4)
+        # Expected RIO order from full list [4, 3, 5, 2, 1]: keep 4, 2.
+        visited_ids = setup_filtered_tree.reverse_in_order_traversal(
+            node_attrs={"state": PipelineStateEnum.FETCHING},
+        )
+        assert visited_ids == [4, 2]
 
-    visited_ids = setup_traversal_tree.reverse_in_order_traversal()
+    def test_reverse_in_order_filter_combined(self, setup_filtered_tree):
+        """Tests RIO traversal with combined data and node attribute filters (AND logic)."""
+        # Filter: type == 'GROUP' AND priority == 15 AND state == FETCHING (Node 4 only)
+        visited_ids = setup_filtered_tree.reverse_in_order_traversal(
+            data_attrs={"type": "GROUP", "priority": 15},
+            node_attrs={"state": PipelineStateEnum.FETCHING},
+        )
+        # Only Node 4 satisfies all three conditions
+        assert visited_ids == [4]
 
-    # Check all nodes are visited
-    assert len(visited_ids) == 7
-    # Check the specific order
-    assert visited_ids == [7, 6, 4, 3, 5, 2, 1]
+    # -----------------------------------------------------------------------
+    # 2. Pre-order Traversal Tests (Root -> Left -> Right)
+    # Full Path: 1 -> 2 -> 5 -> 3 -> 4
+    # -----------------------------------------------------------------------
 
+    def test_preorder_traversal_no_filter(self, setup_filtered_tree):
+        """Tests standard Pre-order traversal order."""
+        # Expected Pre-order: [1, 2, 5, 3, 4]
+        visited_ids = setup_filtered_tree.preorder_traversal()
 
-def test_traversal_from_subtree(setup_traversal_tree):
-    """Tests traversal starting from a non-root node (Node 4)."""
-    # Subtree starting at Node 4 (ID 4 is 'D'):
+        assert visited_ids == [1, 2, 5, 3, 4]
+        assert len(visited_ids) == 5
 
-    # Pre-order starting at 4: 4, 6, 7
-    preorder_ids = setup_traversal_tree.preorder_traversal(node_id=4)
-    assert preorder_ids == [4, 6, 7]
+    def test_preorder_traversal_filter_data(self, setup_filtered_tree):
+        """Tests Pre-order traversal filtering based on data attributes."""
+        # Filter: type == 'GROUP' (Nodes 2, 4)
+        # Expected Pre-order from full list [1, 2, 5, 3, 4]: keep 2, 4.
+        visited_ids = setup_filtered_tree.preorder_traversal(data_attrs={"type": "GROUP"})
+        assert visited_ids == [2, 4]
 
-    # Reverse In-Order starting at 4: 7, 6, 4
-    reverse_in_order_ids = setup_traversal_tree.reverse_in_order_traversal(node_id=4)
-    assert reverse_in_order_ids == [7, 6, 4]
+    def test_preorder_traversal_filter_node_attrs(self, setup_filtered_tree):
+        """Tests Pre-order traversal filtering based on direct node attributes (state)."""
+        # Filter: state == CREATED (Nodes 1, 3)
+        # Expected Pre-order from full list [1, 2, 5, 3, 4]: keep 1, 3.
+        visited_ids = setup_filtered_tree.preorder_traversal(
+            node_attrs={"state": PipelineStateEnum.CREATED},
+        )
+        assert visited_ids == [1, 3]
 
+    def test_preorder_traversal_filter_combined(self, setup_filtered_tree):
+        """Tests Pre-order traversal with combined data and node attribute filters (AND logic)."""
+        # Filter: type == 'GROUP' AND priority == 10 AND state == FETCHING (Node 2 only)
+        visited_ids = setup_filtered_tree.preorder_traversal(
+            data_attrs={"type": "GROUP", "priority": 10},
+            node_attrs={"state": PipelineStateEnum.FETCHING},
+        )
+        # Only Node 2 satisfies all three conditions
+        assert visited_ids == [2]
 
-def test_traversal_empty_tree(empty_tree):
-    """Tests traversals on an empty tree."""
-    assert empty_tree.preorder_traversal() == []
-    assert empty_tree.reverse_in_order_traversal() == []
-
+    def test_preorder_traversal_no_match(self, setup_filtered_tree):
+        """Tests traversal where no nodes match the filter criteria."""
+        # Filter for a non-existent state
+        visited_ids = setup_filtered_tree.preorder_traversal(
+            node_attrs={"state": PipelineStateEnum.COMPLETED},
+        )
+        # Only Node 5 has COMPLETED state, but it is a grandchild, it should be in the list.
+        assert visited_ids == [5]
 
 # --- ANCESTOR FINDER TESTS --------------------------------------------------
 

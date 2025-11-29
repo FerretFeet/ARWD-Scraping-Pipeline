@@ -1,43 +1,16 @@
-"""Web Crawler for requesting and parsing HTML content."""
-
+"""Class to parse html.text using beautiful soup selectors."""
 from bs4 import BeautifulSoup
-from requests import RequestException, Session
 
-from src.config.settings import config
 from src.models.selector_template import SelectorTemplate
 from src.utils.logger import logger
 
 
-class Crawler:
-    """Web Crawler for requesting and parsing HTML content."""
+class HTMLParser:
+    """Parse html.text using beautiful soup selectors."""
 
-    def __init__(self, site: str, *, strict: bool | None = None) -> None:
-        """Initialize the Crawler with domain base-url and optional strict parameter."""
-        self.site = site
-        self.strict = config["strict"] if strict is None else strict
-        self.session = Session()
-        self.session_counter = 0
-
-    def increment_session(self) -> None:
-        """Reset the session after 100 requests."""
-        self.session_counter += 1
-        if self.session_counter % 100 == 0:
-            self.session.close()
-            self.session = Session()
-
-    def get_page(self, url: str) -> str:
-        """Make an http request and return a beautiful soup object of the page."""
-        try:
-            html = self.session.get(url)
-            html.raise_for_status()  # Raise an exception for bad responses (4xx, 5xx)
-
-        except (RequestException, Exception) as e:
-            # Propagate network/HTTP errors as a specific application exception
-            message = f"Failed to fetch URL {url}: {e}"
-            logger.error(message)
-            raise ConnectionError(message) from e
-        self.increment_session()
-        return html.text
+    def __init__(self, *, strict: bool = False) -> None:
+        """Initialize HTML parser."""
+        self.strict = strict
 
     def safe_get(self, soup: BeautifulSoup, selector: str, attr: str = "text") -> list[str] | None:
         """
@@ -82,29 +55,25 @@ class Crawler:
     def get_content(
         self,
         template: SelectorTemplate,
-        path: str,
-        session: Session = None,
+        html_text: str,
     ) -> dict[str, str | list[str] | None | dict[str, str | list[str] | None]]:
         """
-        Request a page and return the parsed content.
+        Parse HTML using beautiful soup selectors.
 
         The 'template.selectors' dict can contain:
         - key: (selector, attr, label) -> For simple, declarative scraping
         - key: callable_function(soup)      -> For complex, imperative scraping
         """
-        if not isinstance(template, SelectorTemplate) or not isinstance(path, str):
+        if not isinstance(template, SelectorTemplate) or not isinstance(html_text, str):
             message = (
                 f"Parameter passed of incorrect type:\n"
-                f"website: {type(template)}, path: {type(path)}"
+                f"website: {type(template)}, path: {type(html_text)}"
             )
             logger.error(message)
             raise TypeError(message)
+        content_holder: dict = {}
+        soup = BeautifulSoup(html_text, "html.parser")
 
-        page_url = template.url + path
-        content_holder = {}
-        session_flag = session is None
-        session = session or Session()
-        soup = self.get_page(session, page_url)
         if soup:
             for key, val in template.selectors.items():
                 if callable(val):
@@ -135,8 +104,5 @@ class Crawler:
                     args = [selector] if attr is None else [selector, attr]
                     content_holder[key] = self.safe_get(soup, *args)
 
-        content_holder["rel_url"] = path
-        content_holder["base_url"] = template.url
-        session.close() if session_flag else None
         logger.info("\nCrawler executed and retrieved content")
         return content_holder

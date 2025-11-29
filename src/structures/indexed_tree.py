@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import json
-from enum import Enum
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
+from src.structures.registries import PipelineRegistryKeys
 from src.utils.custom_exceptions.indexed_tree_exceptions import TreeUpdateError
 from src.utils.logger import logger
 
 
-class PipelineStateEnum(Enum):
+class PipelineStateEnum(IntEnum):
     """Enum for pipeline states."""
 
     CREATED = 0
@@ -31,11 +32,13 @@ class Node:
     def __init__(
         self,
         *,
-        children: list[int] | None = None,
-        parent: int | None = None,
+        node_type: PipelineRegistryKeys,
+        children: list[int] | None,
+        parent: int | None,
         data: dict | None = None,
-        state: int | PipelineStateEnum = PipelineStateEnum.CREATED,
+        state: PipelineStateEnum = PipelineStateEnum.CREATED,
         override_id: int | None = None,
+        url: str | None,
     ) -> None:
         """Initialize Node."""
         # Allow ID override for loading from file
@@ -51,6 +54,8 @@ class Node:
         self.children = children or []
         self.parent = parent
         self.data = data or {}
+        self.url = url
+        self.type = node_type
 
         # Handle state input as Int (from JSON) or Enum
         if isinstance(state, int):
@@ -72,7 +77,7 @@ class Node:
         """Represent Node as string."""
         return (
             f"Node(id={self.id}, state={self.state.name}, children={self.children}, "
-            f"parent={self.parent})"
+            f"parent={self.parent}, type={self.type}, url={self.url})"
         )
 
 
@@ -91,20 +96,29 @@ class IndexedTree:
         self.nodes[root.id] = root
         self.root = root
 
-    def add_node(
+    def add_node(  # noqa: PLR0913
         self,
         *,
+        node_type: PipelineRegistryKeys,
+        parent: int | None,
+        url: str | None,
         children: list[int] | None = None,
-        parent: int | None = None,
         data: dict | None = None,
+        state: PipelineStateEnum = PipelineStateEnum.CREATED,
     ) -> Node:
-        """Add new node to tree and link it to parent."""
-        new_node = Node(children=children, parent=parent, data=data)
+        """Add new node to tree and link it to parent. Parent = None to set root."""
+        new_node = Node(children=children, parent=parent, data=data, state=state, url=url,
+                        node_type=node_type)
         self.nodes[new_node.id] = new_node
 
         if parent is not None and parent in self.nodes:
             self.nodes[parent].children.append(new_node.id)
-
+        if parent is None:
+            if self.root is None:
+                self.root = new_node.id
+            else:
+                msg = "Attempted to create Node with no parent and root is occupied"
+                raise TreeUpdateError(msg)
         return new_node
 
     def remove_parent(self, node_id: int) -> None:
@@ -139,25 +153,46 @@ class IndexedTree:
         # 3. Delete the node
         del self.nodes[node_id]
 
-    def safe_remove_node(self, node_id: int) -> None:
+    def safe_remove_node(self, node_id: int, *, cascade_up: bool = False) -> None | int:
         """Remove node from tree, raise error if it has children."""
         if node_id not in self.nodes:
-            return
+            return None
 
         node = self.nodes[node_id]
         if len(node.children) > 0:
-            msg = f"Node {node_id} has active children: {node.children}. Cannot delete."
-            raise TreeUpdateError(msg)
+            return None
 
         self.__remove_node(node_id)
+
+        if cascade_up:
+            self.safe_remove_node(node.parent)
+
+        return 1
 
     def find_node(self, node_id: int) -> Node | None:
         """Find node by id."""
         return self.nodes.get(node_id)
 
     # --- Traversal Methods ---
+    def __traversal_filter(self, node: Node, *, data_attrs: dict | None = None,
+                           node_attrs: dict | None = None) -> Node | None:
+        should_visit = True
+        if data_attrs:
+            for key, value in data_attrs.items():
+                if key not in node.data or node.data[key] != value:
+                    should_visit = False
+                    break
+        if node_attrs:
+            for key, value in node_attrs.items():
+                if getattr(node, key, None) != value:
+                    should_visit = False
+                    break
+        return node if should_visit else None
 
-    def reverse_in_order_traversal(self, node_id: int | None = None) -> list[Node]:
+    def reverse_in_order_traversal(self, node_id: int | None = None, *,
+                                   data_attrs: dict | None = None,
+                                   node_attrs: dict | None = None) \
+            -> list[int]:
         """
         Perform a Reverse In-Order Traversal starting from a given node ID (defaults to root).
 
@@ -175,16 +210,24 @@ class IndexedTree:
             return []
 
         for child_id in reversed(node.children):
-            result.extend(self.reverse_in_order_traversal(child_id))
+            result.extend(self.reverse_in_order_traversal(child_id, data_attrs=data_attrs,
+                                                          node_attrs=node_attrs))
 
-        result.append(node_id)
+        if self.__traversal_filter(node, data_attrs=data_attrs, node_attrs=node_attrs):
+            # Optionally filter results. returns falsy if target data not in node
+            result.append(node_id)
+
         return result
 
-    def preorder_traversal(self, node_id: int | None = None) -> list[Node]:
+    def preorder_traversal(self, node_id: int | None = None, *,
+                           data_attrs: dict | None = None,
+                           node_attrs: dict | None = None) \
+            -> list[int]:
         """
         Perform Pre-order Traversal starting from a given node ID (defaults to root).
 
         Return a list of nodes in the order they are visited.
+        Optionally filter based on a node attribute value
         """
         if node_id is None:
             node_id = self.root.id if self.root else None
@@ -197,12 +240,14 @@ class IndexedTree:
         if node is None:
             return []
 
-        # 1. Visit Root/Current Node
-        result.append(node_id)
+        if self.__traversal_filter(node, data_attrs=data_attrs, node_attrs=node_attrs):
+            # Optionally filter results. returns falsy if target data not in node
+            result.append(node_id)
 
         # 2. Recurse on Children (Left to Right, following list order)
         for child_id in node.children:
-            result.extend(self.preorder_traversal(child_id))
+            result.extend(self.preorder_traversal(child_id, data_attrs=data_attrs,
+                                                  node_attrs=node_attrs))
 
         return result
 
@@ -247,6 +292,8 @@ class IndexedTree:
                 data=node_data["data"],
                 state=node_data["state"],
                 override_id=node_data["id"],  # Important to restore specific IDs
+                url=node_data["url"],
+                node_type=node_data["node_type"],
             )
             self.nodes[new_node.id] = new_node
 
@@ -268,7 +315,7 @@ class IndexedTree:
         except OSError as e:
             logger.error(f"Error saving file: {e}")
 
-    def load_from_file(self, filepath: Path) -> None:
+    def load_from_file(self, filepath: Path) -> None | int:
         """Load tree from a file."""
         if not Path(filepath).exists():
             msg = f"{filepath} does not exist."
@@ -278,7 +325,11 @@ class IndexedTree:
             json_str = f.read()
 
         self.from_JSON(json_str)
-        logger.info(f"Tree loaded from {filepath}")
+        if self.root:
+            logger.info(f"Tree loaded from {filepath}")
+            return 1
+        return None
+
 
     def __repr__(self) -> str:
         """Represent IndexedTree as a string."""
