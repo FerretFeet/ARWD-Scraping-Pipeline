@@ -8,6 +8,7 @@ dependencies = [
     "beautifulsoup4>=4.14.2",
     "fastapi[standard]>=0.122.0",
     "phonenumbers>=9.0.19",
+    "psycopg[binary]>=3.2.13",
     "pydantic-extra-types>=2.10.6",
     "requests>=2.32.5",
 ]
@@ -31,7 +32,7 @@ docstring-code-format = true
 indent-style = 'space'
 [tool.ruff.lint]
 select = ['ALL']
-ignore = ["E701", "D212", "D203"]
+ignore = ["E701", "D212", "D203", "ERA001"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ['D', 'S101', 'ANN201', 'ANN204', 'INP001', 'ANN001']
 "__init__.py" = ['D']

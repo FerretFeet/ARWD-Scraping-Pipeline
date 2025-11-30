@@ -5,21 +5,33 @@ from enum import Enum, auto
 class PipelineRegistryKeys(Enum):
     """Enum defining pipeline registry keys."""
 
-    BILL_VOTE = auto()
+    ARK_LEG_SEEDER = "https://arkleg.state.ar.us/"
+    LEGISLATOR_LIST = "https://arkleg.state.ar.us/Legislators/List"
+    LEGISLATOR = "https://arkleg.state.ar.us/Legislators/Detail"
+    BILLS_SECTION = "https://arkleg.state.ar.us/Bills"
+    BILL_CATEGORIES = "https://arkleg.state.ar.us/Bills/SearchByRange"
+    BILL_LIST = "https://arkleg.state.ar.us/Bills/ViewBills"
+    BILL = "https://arkleg.state.ar.us/Bills/Detail"
+    BILL_VOTE = "https://arkleg.state.ar.us/Bills/Votes"
+
 
 class PipelineRegistries(Enum):
     """Enum defining pipeline registries."""
 
     FETCH = auto()
     PROCESS = auto()
+    LOAD = auto()
+
 
 PIPELINE_REGISTRY: dict[PipelineRegistryKeys, dict[PipelineRegistries, type | Callable]] = {}
 
 for job_key in PipelineRegistryKeys:
     PIPELINE_REGISTRY[job_key] = {}
 
+
 def register_processor(
-    name: PipelineRegistryKeys, stage: PipelineRegistries,
+    name: PipelineRegistryKeys,
+    stage: PipelineRegistries,
 ) -> Callable[[type | Callable], type | Callable]:
     """
     Decorator to register a class or function into the two-level global registry.
@@ -35,7 +47,7 @@ def register_processor(
         if name not in PIPELINE_REGISTRY:
             msg = f"Job key '{name.name}' is not initialized in the global registry."
             raise ValueError(msg)
-
+        name = name.value
         # 2. Check for duplicate registration at the specific stage
         if stage in PIPELINE_REGISTRY[name]:
             msg = f"Processor for job '{name.name}' and stage '{stage.name}' is already registered."

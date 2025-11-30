@@ -4,25 +4,35 @@ import re
 
 from bs4 import BeautifulSoup
 
+from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
+from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.models.selector_template import SelectorTemplate
+from src.structures.registries import PipelineRegistries, PipelineRegistryKeys, register_processor
 
 
+@register_processor(PipelineRegistryKeys.BILL_VOTE, PipelineRegistries.PROCESS)
 class BillVoteSelector(SelectorTemplate):
     """Selector for Arkleg Bill Vote Page."""
-
-    next_page: str
 
     def __init__(self, url: str) -> None:
         """Initialize the selector template."""
         super().__init__(
-            url=url,
             selectors={
-                "title": ("div h1"),
-                "yea_voters": _VoteListParsers.parse_yea_names,
-                "nay_voters": _VoteListParsers.parse_nay_names,
-                "non_voting_voters": _VoteListParsers.parse_non_voting_names,
-                "present_voters": _VoteListParsers.parse_present_names,
-                "excused_voters": _VoteListParsers.parse_excused_names,
+                "title": (("div h1"), normalize_str),
+                "yea_voters": (_VoteListParsers.parse_yea_names, normalize_list_of_str_link),
+                "nay_voters": (_VoteListParsers.parse_nay_names, normalize_list_of_str_link),
+                "non_voting_voters": (
+                    _VoteListParsers.parse_non_voting_names,
+                    normalize_list_of_str_link,
+                ),
+                "present_voters": (
+                    _VoteListParsers.parse_present_names,
+                    normalize_list_of_str_link,
+                ),
+                "excused_voters": (
+                    _VoteListParsers.parse_excused_names,
+                    normalize_list_of_str_link,
+                ),
             },
         )
 

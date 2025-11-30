@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import threading
 from enum import IntEnum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from src.structures.registries import PipelineRegistryKeys
 from src.utils.custom_exceptions.indexed_tree_exceptions import TreeUpdateError
 from src.utils.logger import logger
+
+if TYPE_CHECKING:
+    from src.structures.registries import PipelineRegistryKeys
 
 
 class PipelineStateEnum(IntEnum):
@@ -20,7 +23,8 @@ class PipelineStateEnum(IntEnum):
     FETCHING = 2
     AWAITING_PROCESSING = 3
     PROCESSING = 4
-    PROCESSED = 5
+    AWAITING_LOAD = 5
+    LOADING = 6
     COMPLETED = 6
 
 
@@ -29,12 +33,12 @@ class Node:
 
     id_counter = 1
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         node_type: PipelineRegistryKeys,
-        children: list[int] | None,
-        parent: int | None,
+        children: list[Node] | None,
+        parent: Node | None,
         data: dict | None = None,
         state: PipelineStateEnum = PipelineStateEnum.CREATED,
         override_id: int | None = None,
@@ -56,6 +60,7 @@ class Node:
         self.data = data or {}
         self.url = url
         self.type = node_type
+        self.lock = threading.Lock()
 
         # Handle state input as Int (from JSON) or Enum
         if isinstance(state, int):
@@ -76,8 +81,9 @@ class Node:
     def __repr__(self) -> str:
         """Represent Node as string."""
         return (
-            f"Node(id={self.id}, state={self.state.name}, children={self.children}, "
-            f"parent={self.parent}, type={self.type}, url={self.url})"
+            f"Node(id={self.id}, state={self.state.name}, "
+            f"children={[child.id for child in self.children]}, "
+            f"parent={self.parent.id}, type={self.type}, url={self.url})"
         )
 
 
@@ -100,69 +106,80 @@ class IndexedTree:
         self,
         *,
         node_type: PipelineRegistryKeys,
-        parent: int | None,
+        parent: Node | None,
         url: str | None,
-        children: list[int] | None = None,
+        children: list[Node] | None = None,
         data: dict | None = None,
         state: PipelineStateEnum = PipelineStateEnum.CREATED,
     ) -> Node:
         """Add new node to tree and link it to parent. Parent = None to set root."""
-        new_node = Node(children=children, parent=parent, data=data, state=state, url=url,
-                        node_type=node_type)
+        new_node = Node(
+            children=children,
+            parent=parent,
+            data=data,
+            state=state,
+            url=url,
+            node_type=node_type,
+        )
         self.nodes[new_node.id] = new_node
 
-        if parent is not None and parent in self.nodes:
-            self.nodes[parent].children.append(new_node.id)
-        if parent is None:
+        if parent is not None and parent.id in self.nodes:
+            parent.children.append(new_node)
+        elif parent is None:
             if self.root is None:
                 self.root = new_node.id
             else:
                 msg = "Attempted to create Node with no parent and root is occupied"
                 raise TreeUpdateError(msg)
+        else:
+            self.nodes[parent.id] = parent
         return new_node
 
-    def remove_parent(self, node_id: int) -> None:
-        """Remove parent relationship by child node by id."""
-        if node_id not in self.nodes:
-            return
+    def remove_parent(self, node: int | Node) -> None:
+        """Remove parent relationship by child node by id or by reference."""
+        if isinstance(node, int):
+            if node not in self.nodes:
+                return
+            node = self.nodes[node]
+        parent_id = node.parent.id
 
-        node = self.nodes[node_id]
-        parent_id = node.parent
-
-        if parent_id and parent_id in self.nodes and node_id in self.nodes[parent_id].children:
-            self.nodes[parent_id].children.remove(node_id)
+        if parent_id and parent_id in self.nodes and node.id in self.nodes[parent_id].children:
+            node.parent.children.remove(node)
 
         node.parent = None
         # No need to re-set self.nodes[node_id], object is mutable
 
-    def __remove_node(self, node_id: int) -> None:
-        """Remove node from tree completely."""
-        if node_id not in self.nodes:
-            return
+    def __remove_node(self, node: int | Node) -> None:
+        """Remove node from tree completely. By id or reference."""
+        if isinstance(node, int):
+            if node not in self.nodes:
+                return
+            node = self.nodes[node]
 
         # 1. Unlink from parent
-        self.remove_parent(node_id)
+        self.remove_parent(node)
 
         # 2. Handle orphaned children (Optional: Decide if children are deleted or promoted)
         # Current logic: Children become orphans (parent=None)
-        children = self.nodes[node_id].children
-        for child_id in children:
-            if child_id in self.nodes:
-                self.nodes[child_id].parent = None
+        children = self.nodes[node.id].children
+        for child in children:
+            if child in self.nodes:
+                child.parent = None
 
         # 3. Delete the node
-        del self.nodes[node_id]
+        del self.nodes[node.id]
 
-    def safe_remove_node(self, node_id: int, *, cascade_up: bool = False) -> None | int:
+    def safe_remove_node(self, node: int | Node, *, cascade_up: bool = False) -> None | int:
         """Remove node from tree, raise error if it has children."""
-        if node_id not in self.nodes:
-            return None
+        if isinstance(node, int):
+            if node not in self.nodes:
+                return None
 
-        node = self.nodes[node_id]
+            node = self.nodes[node]
         if len(node.children) > 0:
             return None
 
-        self.__remove_node(node_id)
+        self.__remove_node(node)
 
         if cascade_up:
             self.safe_remove_node(node.parent)
@@ -174,8 +191,13 @@ class IndexedTree:
         return self.nodes.get(node_id)
 
     # --- Traversal Methods ---
-    def __traversal_filter(self, node: Node, *, data_attrs: dict | None = None,
-                           node_attrs: dict | None = None) -> Node | None:
+    def __traversal_filter(
+        self,
+        node: Node,
+        *,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+    ) -> Node | None:
         should_visit = True
         if data_attrs:
             for key, value in data_attrs.items():
@@ -189,10 +211,13 @@ class IndexedTree:
                     break
         return node if should_visit else None
 
-    def reverse_in_order_traversal(self, node_id: int | None = None, *,
-                                   data_attrs: dict | None = None,
-                                   node_attrs: dict | None = None) \
-            -> list[int]:
+    def reverse_in_order_traversal(
+        self,
+        node_id: int | None = None,
+        *,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+    ) -> list[Node]:
         """
         Perform a Reverse In-Order Traversal starting from a given node ID (defaults to root).
 
@@ -209,20 +234,28 @@ class IndexedTree:
         if node is None:
             return []
 
-        for child_id in reversed(node.children):
-            result.extend(self.reverse_in_order_traversal(child_id, data_attrs=data_attrs,
-                                                          node_attrs=node_attrs))
+        for child in reversed(node.children):
+            result.extend(
+                self.reverse_in_order_traversal(
+                    child.id,
+                    data_attrs=data_attrs,
+                    node_attrs=node_attrs,
+                ),
+            )
 
         if self.__traversal_filter(node, data_attrs=data_attrs, node_attrs=node_attrs):
             # Optionally filter results. returns falsy if target data not in node
-            result.append(node_id)
+            result.append(node)
 
         return result
 
-    def preorder_traversal(self, node_id: int | None = None, *,
-                           data_attrs: dict | None = None,
-                           node_attrs: dict | None = None) \
-            -> list[int]:
+    def preorder_traversal(
+        self,
+        node_id: int | None = None,
+        *,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+    ) -> list[Node]:
         """
         Perform Pre-order Traversal starting from a given node ID (defaults to root).
 
@@ -242,22 +275,29 @@ class IndexedTree:
 
         if self.__traversal_filter(node, data_attrs=data_attrs, node_attrs=node_attrs):
             # Optionally filter results. returns falsy if target data not in node
-            result.append(node_id)
+            result.append(node)
 
         # 2. Recurse on Children (Left to Right, following list order)
         for child_id in node.children:
-            result.extend(self.preorder_traversal(child_id, data_attrs=data_attrs,
-                                                  node_attrs=node_attrs))
+            result.extend(
+                self.preorder_traversal(child_id, data_attrs=data_attrs, node_attrs=node_attrs),
+            )
 
         return result
 
-    def find_val_ancestor(self, node_id: int, attr: str, value: str | None = None) -> Node | None:
+    def find_val_ancestor(
+        self,
+        node: int | Node,
+        attr: str,
+        value: str | None = None,
+    ) -> Node | None:
         """Return an ancestor with a specified .data attr or value."""
-        node = self.find_node(node_id)
-        if not node.parent:
-            return None
+        if isinstance(node, int):
+            node = self.find_node(node)
+            if not node.parent:
+                return None
 
-        parent = self.find_node(node.parent)
+        parent = node.parent
         target = parent.data.get(attr, None)
 
         if target:
@@ -266,7 +306,7 @@ class IndexedTree:
             if value and value == target:
                 return parent
 
-        return self.find_val_ancestor(parent.id, attr, value)
+        return self.find_val_ancestor(parent, attr, value)
 
     # --- Serialization Methods ---
 
@@ -329,7 +369,6 @@ class IndexedTree:
             logger.info(f"Tree loaded from {filepath}")
             return 1
         return None
-
 
     def __repr__(self) -> str:
         """Represent IndexedTree as a string."""
