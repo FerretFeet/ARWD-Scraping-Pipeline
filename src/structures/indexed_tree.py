@@ -83,7 +83,7 @@ class Node:
         return (
             f"Node(id={self.id}, state={self.state.name}, "
             f"children={[child.id for child in self.children]}, "
-            f"parent={self.parent.id}, type={self.type}, url={self.url})"
+            f"parent={self.parent.id if self.parent else "None"}, type={self.type}, url={self.url})"
         )
 
 
@@ -121,18 +121,20 @@ class IndexedTree:
             url=url,
             node_type=node_type,
         )
-        self.nodes[new_node.id] = new_node
 
         if parent is not None and parent.id in self.nodes:
             parent.children.append(new_node)
         elif parent is None:
             if self.root is None:
-                self.root = new_node.id
+                self.root = new_node
             else:
                 msg = "Attempted to create Node with no parent and root is occupied"
-                raise TreeUpdateError(msg)
+                err = TreeUpdateError(msg)
+                raise err
         else:
             self.nodes[parent.id] = parent
+        self.nodes[new_node.id] = new_node
+
         return new_node
 
     def remove_parent(self, node: int | Node) -> None:
@@ -141,48 +143,48 @@ class IndexedTree:
             if node not in self.nodes:
                 return
             node = self.nodes[node]
+        if not node.parent: return
         parent_id = node.parent.id
 
-        if parent_id and parent_id in self.nodes and node.id in self.nodes[parent_id].children:
+        if parent_id and parent_id in self.nodes and node in node.parent.children:
             node.parent.children.remove(node)
 
         node.parent = None
         # No need to re-set self.nodes[node_id], object is mutable
 
-    def __remove_node(self, node: int | Node) -> None:
+    def __remove_node(self, node: Node) -> None:
         """Remove node from tree completely. By id or reference."""
-        if isinstance(node, int):
-            if node not in self.nodes:
-                return
-            node = self.nodes[node]
-
         # 1. Unlink from parent
         self.remove_parent(node)
 
-        # 2. Handle orphaned children (Optional: Decide if children are deleted or promoted)
         # Current logic: Children become orphans (parent=None)
-        children = self.nodes[node.id].children
-        for child in children:
+        for child in node.children:
             if child in self.nodes:
                 child.parent = None
+        if node == self.root:
+            self.root = None
 
         # 3. Delete the node
+
         del self.nodes[node.id]
+        del node
 
     def safe_remove_node(self, node: int | Node, *, cascade_up: bool = False) -> None | int:
         """Remove node from tree, raise error if it has children."""
+        if not node:
+            return None
         if isinstance(node, int):
             if node not in self.nodes:
                 return None
-
             node = self.nodes[node]
+        parent = node.parent
         if len(node.children) > 0:
             return None
 
         self.__remove_node(node)
 
         if cascade_up:
-            self.safe_remove_node(node.parent)
+            self.safe_remove_node(parent, cascade_up=True)
 
         return 1
 
@@ -199,16 +201,17 @@ class IndexedTree:
         node_attrs: dict | None = None,
     ) -> Node | None:
         should_visit = True
-        if data_attrs:
+        if not node: return None
+        if data_attrs and node:
             for key, value in data_attrs.items():
-                if key not in node.data or node.data[key] != value:
+                if key not in node.data or (value and node.data[key] != value):
                     should_visit = False
-                    break
-        if node_attrs:
+                    return None
+        if node_attrs and node:
             for key, value in node_attrs.items():
-                if getattr(node, key, None) != value:
+                if value and getattr(node, key, None) != value:
                     should_visit = False
-                    break
+                    return None
         return node if should_visit else None
 
     def reverse_in_order_traversal(
@@ -262,25 +265,20 @@ class IndexedTree:
         Return a list of nodes in the order they are visited.
         Optionally filter based on a node attribute value
         """
-        if node_id is None:
-            node_id = self.root.id if self.root else None
-
-        if node_id is None:
-            return []
+        node = self.root if node_id is None else self.find_node(node_id)
 
         result = []
-        node = self.find_node(node_id)
         if node is None:
-            return []
+            return result
 
         if self.__traversal_filter(node, data_attrs=data_attrs, node_attrs=node_attrs):
             # Optionally filter results. returns falsy if target data not in node
             result.append(node)
 
         # 2. Recurse on Children (Left to Right, following list order)
-        for child_id in node.children:
+        for child in node.children:
             result.extend(
-                self.preorder_traversal(child_id, data_attrs=data_attrs, node_attrs=node_attrs),
+                self.preorder_traversal(child.id, data_attrs=data_attrs, node_attrs=node_attrs),
             )
 
         return result
@@ -298,6 +296,7 @@ class IndexedTree:
                 return None
 
         parent = node.parent
+        if not parent: return None
         target = parent.data.get(attr, None)
 
         if target:
