@@ -285,32 +285,68 @@ class LoaderWorker(threading.Thread):
         self.strict= strict
 
     def run(self) -> None:
-        """Run the processor worker."""
+        """Run the loader worker."""
+        # Use 'self.running and self.input_queue.empty()' condition if you need to end on empty queue
         while self.running:
+            loader_obj: LoaderObj = None # Initialize to None for error handling
+
             try:
-                loader_obj: LoaderObj = self.input_queue.get(timeout=1)
+                # 1. Get the item (Safely handles Empty exception)
+                loader_obj = self.input_queue.get(timeout=1)
                 node = loader_obj.node
+
+                # --- Begin Transaction and Lock State ---
+
                 with node.lock:
                     node.state = PipelineStateEnum.LOADING
-                    logger.info(f"[LOADER] Loading data for Node ID {node.id}")
-                    page_enum = loader_obj.name
-                    loader_fun = self.fun_registry.get_processor(page_enum, PipelineRegistries.LOAD)
-                    loader = PipelineLoader(strict=self.strict)
-                    # loader_obj.params insert into load function
-                    # node.data = loaded_result
+                    logger.info(f"[LOADER] Starting transaction for Node ID {node.id}")
+
+                # 2. Lookup Function
+                page_enum = loader_obj.name
+                loader_fun = self.fun_registry.get_processor(page_enum, PipelineRegistries.LOAD)
+
+                # 3. Execute Load Function (where DB insert happens)
+                result = loader_fun(loader_obj.params, self.db_conn)
+
+                # 4. Commit DB & Update State
+                self.db_conn.commit() # 🚨 Commit the DB changes
+
+                # Lock for final state update
+                with node.lock:
+                    node.data = result
                     node.state = PipelineStateEnum.COMPLETED
-                    keep_node = False
-                    for child_id in node.children:
-                        child = self.state.find_node(child_id)
-                        if child.state != PipelineStateEnum.COMPLETED:
-                            keep_node = True
+
+                    # 5. Check Children and Remove Node (KEEP THIS IN THE LOCK)
+                    keep_node = any(
+                        self.state.find_node(child_id).state != PipelineStateEnum.COMPLETED
+                        for child_id in node.children
+                    )
 
                     if not keep_node:
+                        # self.state.safe_remove_node should handle its own state tree locks
                         self.state.safe_remove_node(node.id, cascade_up=True)
-                    self.state.save_file(state_cache_file)
 
-                    self.input_queue.task_done()
+                # 6. Save State File (Needs external lock if state_cache_file is shared)
+                # If self.state.save_file is not thread-safe, this must be protected
+                # by a dedicated global state-saving lock. For now, we assume it's thread-safe
+                # or we are relying on IndexedTree to handle file locking.
+                self.state.save_file(state_cache_file)
+
             except Empty:
-                continue
+                continue # Safely skip and continue loop
+
             except Exception as e:
-                logger.warning(f"[LOADER ERROR] Node ID {node.id}: {e}")
+                # 🚨 Handle Failure: Log error, rollback DB, update state
+                logger.warning(f"[LOADER ERROR] Node ID {node.id if loader_obj else 'Unknown'}: {e}")
+
+                if loader_obj:
+                    # Rollback the transaction if it failed
+                    self.db_conn.rollback()
+
+                    with node.lock:
+                        node.state = PipelineStateEnum.ERROR # Mark node as failed
+
+            finally:
+                # 🚨 GUARANTEE: Ensure the task is always marked done if we got an item
+                if loader_obj:
+                    self.input_queue.task_done()

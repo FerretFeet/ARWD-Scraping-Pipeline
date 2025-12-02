@@ -8,10 +8,27 @@ import pytest
 from src.structures.indexed_tree import PipelineStateEnum
 from src.workers.pipeline_workers import (
     CrawlerWorker,
+    LoaderWorker,
     ProcessorWorker,
 )
 
 
+@pytest.fixture
+def fake_db_conn():
+    """Mocks the psycopg database connection."""
+    db_conn = MagicMock()
+    return db_conn
+
+@pytest.fixture
+def fake_loader_obj(fake_node):
+    """Mocks the LoaderObj that the worker consumes."""
+    loader_obj = MagicMock()
+    loader_obj.node = fake_node
+    # The worker looks up the processor using loader_obj.name
+    loader_obj.name = "PAGE_ENUM_FOR_LOADER"
+    # The worker passes loader_obj.params to the loader function
+    loader_obj.params = {"transformed_data": "final"}
+    return loader_obj
 # Mock the Crawler to return mock HTML content
 @pytest.fixture
 def fake_crawler():
@@ -84,7 +101,8 @@ def patched_dependencies():
     # 3. LoaderObj Class Mock
     MockLoaderObj = MagicMock()
 
-    # --- Execute Patching ---
+    mock_loader_fun = MagicMock()
+    mock_loader_fun.return_value = {"updated_data": "success"}
 
     with (
         patch("src.workers.pipeline_workers.logger") as MockLogger,
@@ -114,6 +132,9 @@ def patched_dependencies():
             # Used for new node type
         ]
 
+        MockFunRegistry = MagicMock()
+        MockFunRegistry.get_processor.return_value = mock_loader_fun
+
         # --- Yield All Mock Objects ---
 
         yield {
@@ -123,6 +144,8 @@ def patched_dependencies():
             "MockLoaderObj": MockLoaderObj,  # Mocked Class
             "MockGetEnumByUrl": MockGetEnumByUrl,
             "MockPipelineRegistries": MockPipelineRegistries,
+            "MockLoaderFun": mock_loader_fun,
+            "MockFunRegistry": MockFunRegistry,
             # 🟢 Mocked Instances (for asserting method calls)
             "html_parser_instance": mock_html_parser_instance,  # Instance for .get_content calls
             "mock_transformer_instance": mock_transformer_instance,  # Instance for .transform_content calls
@@ -512,75 +535,72 @@ class TestProcessorWorker:
 # # LOADER WORKER
 # # -------------------------
 #
-# def test_loader_worker_marks_completed_and_removes(fake_tree, fake_node, monkeypatch):
-#     iq = Queue()
-#
-#     fake_db = MagicMock()
-#
-#     fake_node.children = []  # no children → should be removed
-#     loader_obj = LoaderObj(node_id=fake_node.id, name="TEST", params={})
-#     iq.put(loader_obj)
-#
-#     worker = LoaderWorker(
-#         input_queue=iq,
-#         state_tree=fake_tree,
-#         db_conn=fake_db,
-#     )
-#     worker.running = True
-#     worker.start()
-#
-#     time.sleep(0.2)
-#     worker.running = False
-#     worker.join(timeout=1)
-#
-#     assert fake_node.state == PipelineStateEnum.COMPLETED
-#     fake_tree.safe_remove_node.assert_called_once_with(fake_node.id, cascade_up=True)
-#     fake_tree.save_file.assert_called_once()
+class TestLoaderWorker:
+    def test_loader_worker_completes_successfully(
+            self,
+            fake_tree,
+            fake_node,
+            fake_loader_obj,
+            fake_db_conn,
+            fake_registry,
+            # NOTE: Pass your fixture that mocks fun_registry here
+            patched_dependencies,
+    ):
+        """Tests the worker executes load function, commits DB, and sets state to COMPLETED."""
 
+        Mocks = patched_dependencies
 
+        # 1. Setup Queues and Worker
+        input_queue = LifoQueue()
 
-# Integration test for both workers working together
-# def test_full_pipeline(fake_node, fake_crawler, fake_registry):
-#     fetch_queue = LifoQueue()
-#     process_queue = LifoQueue()
-#     output_queue = Queue()
-#     state_tree = IndexedTree()
-#
-#     fetch_queue.put(fake_node)
-#
-#     # Create the worker instances
-#     crawler_worker = CrawlerWorker(
-#         fetch_queue=fetch_queue,
-#         process_queue=process_queue,
-#         state_tree=state_tree,
-#         crawler=fake_crawler,
-#         fun_registry=fake_registry,
-#         strict=False,
-#     )
-#
-#     processor_worker = ProcessorWorker(
-#         input_queue=process_queue,
-#         output_queue=output_queue,
-#         state_tree=state_tree,
-#         fun_registry=fake_registry,
-#         strict=False,
-#     )
-#
-#     # Start both workers in separate threads
-#     crawler_worker.start()
-#     processor_worker.start()
-#
-#     # Allow the workers to process
-#     time.sleep(1)  # Or better yet, use a synchronization mechanism like an Event
-#     crawler_worker.running = False
-#     processor_worker.running = False
-#
-#     crawler_worker.join()
-#     processor_worker.join()
-#
-#     # Assert that the processing pipeline ran correctly
-#     assert fake_node.state == PipelineStateEnum.AWAITING_LOAD
-#     assert output_queue.qsize() == 1
-#     loader_obj = output_queue.get()
-#     assert loader_obj.node == fake_node
-#     assert loader_obj.params == {"item": [{"a": 1}]}
+        # Add a mock child to prevent the node from being removed in this success case
+        mock_child = MagicMock()
+        mock_child.state = PipelineStateEnum.AWAITING_FETCH # Node will be kept because child isn't COMPLETED
+        fake_node.children = ["child_id_1"]
+        fake_tree.find_node.return_value = mock_child
+
+        # NOTE: Use the mocked fun_registry object (MockFunRegistry) from your combined fixture
+        # If your fun_registry fixture is separate, use that name instead of Mocks["MockFunRegistry"]
+        worker = LoaderWorker(
+            input_queue=input_queue,
+            state_tree=fake_tree,
+            db_conn=fake_db_conn,
+            fun_registry=Mocks["MockFunRegistry"],
+            strict=False,
+        )
+        worker.running = True
+
+        # Act
+        input_queue.put(fake_loader_obj)
+        worker.start()
+
+        # Wait until queue empties
+        try:
+            input_queue.join(timeout=5)
+        except Exception:
+            pass
+
+        worker.running = False
+        worker.join(timeout=1)
+
+        # Assertions
+
+        # 1. Assert Database and Load Function Calls
+        Mocks["MockLoaderFun"].assert_called_once_with(
+            fake_loader_obj.params,
+            fake_db_conn,
+        )
+        fake_db_conn.commit.assert_called_once()
+        fake_db_conn.rollback.assert_not_called()
+
+        # 2. Assert State and Data Update
+        assert fake_node.state == PipelineStateEnum.COMPLETED
+        assert fake_node.data == {"updated_data": "success"} # Matches mock_loader_fun return
+
+        # 3. Assert Tree/File Operations
+        fake_tree.safe_remove_node.assert_not_called()
+        fake_tree.save_file.assert_called_once()
+        Mocks["MockLogger"].info.assert_called() # Check logging happened
+
+        # 4. Assert Queue Cleanup
+        assert input_queue.qsize() == 0
