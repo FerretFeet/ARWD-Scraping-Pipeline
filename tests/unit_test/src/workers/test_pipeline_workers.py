@@ -1,11 +1,10 @@
 import threading
-import time
 from queue import LifoQueue, Queue
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
-from src.data_pipeline.extract.webcrawler import Crawler
 from src.structures.indexed_tree import PipelineStateEnum
 from src.workers.pipeline_workers import (
     CrawlerWorker,
@@ -16,8 +15,11 @@ from src.workers.pipeline_workers import (
 # Mock the Crawler to return mock HTML content
 @pytest.fixture
 def fake_crawler():
-    crawler = MagicMock(spec=Crawler)
-    crawler.get_page.return_value = "<html><body><a href='http://newlink.com'>Next</a></body></html>"
+    crawler = MagicMock()  # spec=Crawler not needed if not asserting spec details
+    # Return HTML with a link to simulate new links found by the parser
+    crawler.get_page.return_value = (
+        "<html><body><a href='http://newlink.com/page.html?q=1'>Next</a></body></html>"
+    )
     return crawler
 
 
@@ -25,8 +27,10 @@ def fake_crawler():
 @pytest.fixture
 def fake_registry():
     registry = MagicMock()
+    # Template needed for link parsing (FETCH registry)
+    # The worker passes the enum value (a string) as the first arg.
     registry.get_processor.return_value = {
-        "x": ("html_selector", lambda x: {"x": "processed_data"}),
+        "links": ("a[href]",),  # A simple selector tuple for the parser
     }
     return registry
 
@@ -36,12 +40,14 @@ def fake_node():
     class Node:
         def __init__(self):
             self.id = "1"
-            self.url = "https://arkleg.state.ar.us/"
+            # 🚨 Must be a valid structure for splitting: http(s)://domain/path
+            self.url = "https://arkleg.state.ar.us/page.html"
             self.state = None
             self.data = {"html": "<html><h1>Test HTML</h1></html>"}
             self.type = "TEST"
             self.children = []
             self.lock = threading.Lock()
+
     return Node()
 
 
@@ -53,46 +59,211 @@ def fake_tree(fake_node):
     return tree
 
 
-# -------------------------
-# CRAWLER WORKER
-# -------------------------
+@pytest.fixture
+def patched_dependencies():
+    """
+    Patches core logic for a pipeline worker (Fetch, Process, Load) and
+    returns all mock objects for assertion.
+    """
 
-def test_crawler_worker_fetches_and_pushes(fake_tree, fake_node, monkeypatch):
-    fq = LifoQueue()
-    pq = LifoQueue()
+    # --- Define and Configure Mock Instances OUTSIDE Patch Context ---
 
-    fake_crawler = MagicMock()
-    fake_crawler.get_page.return_value = "<html>hi</html>"
+    # 1. HTMLParser Instance (for both fetching links and basic content)
+    mock_html_parser_instance = MagicMock()
+    # Mock return for a successful fetch/parse (links and page data)
+    mock_html_parser_instance.get_content.return_value = {
+        "page_data": "parsed",
+        "links": ["http://newlink.com/page.html?q=1"],  # Include links for crawler worker
+    }
 
-    # Fake pipeline registry
-    fake_registry = MagicMock()
-    fake_registry.get_processor.return_value = {"next": ("div")}
+    # 2. PipelineTransformer Instance
+    mock_transformer_instance = MagicMock()
+    # Mock return for a successful transformation
+    mock_transformer_instance.transform_content.return_value = {"final_output": "data"}
 
-    monkeypatch.setattr("src.workers.pipeline_workers.ProcessorRegistry", fake_registry)
+    # 3. LoaderObj Class Mock
+    MockLoaderObj = MagicMock()
 
-    worker = CrawlerWorker(
-        fetch_queue=fq,
-        process_queue=pq,
-        state_tree=fake_tree,
-        crawler=fake_crawler,
-        fun_registry=fake_registry,
-        strict=False,
-    )
-    worker.running = True
+    # --- Execute Patching ---
 
-    fq.put(fake_node)
-    worker.start()
+    with (
+        patch("src.workers.pipeline_workers.logger") as MockLogger,
+        # 🟢 Use return_value to ensure the worker gets our pre-configured instance
+        patch(
+            "src.workers.pipeline_workers.HTMLParser",
+            return_value=mock_html_parser_instance,
+        ) as MockHTMLParser,
+        # Transformer is mocked by its name, returning our pre-configured instance
+        patch(
+            "src.workers.pipeline_workers.PipelineTransformer",
+            return_value=mock_transformer_instance,
+        ) as MockPipelineTransformer,
+        # LoaderObj is mocked by the class definition above
+        patch("src.workers.pipeline_workers.LoaderObj", new=MockLoaderObj),
+        patch("src.workers.pipeline_workers.get_enum_by_url") as MockGetEnumByUrl,
+        patch("src.workers.pipeline_workers.PipelineRegistries") as MockPipelineRegistries,
+        # Patch PipelineStateEnum only if you need to decouple the mock from the real enum.
+        # Otherwise, if you use the real enum, you can omit this patch.
+    ):
+        # Configure simple class/function mocks
+        # Example: Mocking the enum setup from the second fixture
+        MockGetEnumByUrl.side_effect = [
+            "CURRENT_PAGE_ENUM",  # Used for registry lookup
+            "PARSED_ENUM",
+            "NEW_LINK_ENUM",
+            # Used for new node type
+        ]
 
-    # Wait until queue empties
-    time.sleep(0.2)
-    worker.running = False
-    worker.join(timeout=1)
+        # --- Yield All Mock Objects ---
 
-    # Assertions
-    assert fake_node.state == PipelineStateEnum.AWAITING_PROCESSING
-    assert pq.qsize() == 1
-    fake_crawler.get_page.assert_called_once()
+        yield {
+            "MockLogger": MockLogger,
+            "MockHTMLParser": MockHTMLParser,  # Mocked Class
+            "MockTransformer": MockPipelineTransformer,  # Mocked Class
+            "MockLoaderObj": MockLoaderObj,  # Mocked Class
+            "MockGetEnumByUrl": MockGetEnumByUrl,
+            "MockPipelineRegistries": MockPipelineRegistries,
+            # 🟢 Mocked Instances (for asserting method calls)
+            "html_parser_instance": mock_html_parser_instance,  # Instance for .get_content calls
+            "mock_transformer_instance": mock_transformer_instance,  # Instance for .transform_content calls
+        }
 
+
+# --- ------------------------- ---
+# --- CRAWLER WORKER TEST CLASS ---
+# --- ------------------------- ---
+
+
+class TestCrawlerWorker:
+    def test_crawler_worker_fetches_and_pushes_success(
+        self,
+        fake_tree,
+        fake_node,
+        fake_crawler,
+        fake_registry,
+        patched_dependencies,
+    ):
+        """Test the complete successful cycle: fetch page, update state, find links, put node on process queue."""
+
+        fq = LifoQueue()
+        pq = LifoQueue()
+        Mocks = patched_dependencies
+
+        # 🚨 Use the real Enum values for initial comparison
+        # (This is implicitly handled by the fixture setup, but good practice to know)
+
+        worker = CrawlerWorker(
+            fetch_queue=fq,
+            process_queue=pq,
+            state_tree=fake_tree,
+            crawler=fake_crawler,
+            fun_registry=fake_registry,
+            strict=False,
+        )
+        worker.running = True
+        html_parser_instance = Mocks["html_parser_instance"]
+        # Act
+        fq.put(fake_node)
+        worker.start()
+
+        # Wait until queue empties (task_done is called)
+        try:
+            # Join queue for deterministic wait
+            fq.join(timeout=5)
+        except Exception:
+            pass
+
+        # Stop and join the thread
+        worker.running = False
+        worker.join(timeout=1)
+
+        # Assertions
+
+        # 1. Assert Node States and Queues
+        # 🚨 FIX 2: Assert against the REAL enum value (or the mocked one from Mocks)
+        assert fake_node.state == PipelineStateEnum.AWAITING_PROCESSING
+        assert pq.qsize() == 1  # Node moved to process queue
+        assert fq.qsize() == 2  # A new link was found and put back on the fetch queue
+
+        # 2. Assert Crawler and HTML Parser Calls
+        fake_crawler.get_page.assert_called_once()
+
+        # Worker splits URL and passes the stem to get_page (e.g., 'arkleg.state.ar.us/page.html')
+        parsed_url = urlparse(fake_node.url)
+        expected_url_stem = parsed_url.path
+        fake_crawler.get_page.assert_called_once_with(expected_url_stem)
+
+        Mocks["MockHTMLParser"].assert_called_once_with(strict=False)
+        Mocks["html_parser_instance"].get_content.assert_called_once()
+
+        # 3. Assert Link Logic (New Node Creation)
+        assert fake_tree.add_node.call_count == 2
+        fake_tree.add_node.assert_called_with(
+            parent=fake_node.id,
+            url="http://newlink.com/page.html?q=1",
+            state=PipelineStateEnum.AWAITING_FETCH,
+            node_type="NEW_LINK_ENUM",  # Use the second side_effect value
+        )
+        # Assert get_enum_by_url was called twice
+        assert Mocks["MockGetEnumByUrl"].call_count == 3, ("expect get enum by url to be called once"
+                                                           "+ once per added link")
+
+    def test_crawler_worker_handles_exception(
+        self,
+        fake_tree,
+        fake_node,
+        fake_crawler,
+        fake_registry,
+        patched_dependencies,
+    ):
+        """Test that the worker catches an exception during fetching and logs an error."""
+
+        fq = LifoQueue()
+        pq = LifoQueue()
+        Mocks = patched_dependencies
+
+        # 1. Setup: Make the crawler fail immediately
+        error_message = "Network Connection Lost"
+        fake_crawler.get_page.side_effect = Exception(error_message)
+
+        worker = CrawlerWorker(
+            fetch_queue=fq,
+            process_queue=pq,
+            state_tree=fake_tree,
+            crawler=fake_crawler,
+            fun_registry=fake_registry,
+            strict=False,
+        )
+        worker.running = True
+
+        # Act
+        fq.put(fake_node)
+        worker.start()
+
+        # Wait for the worker to process the node and fail
+        try:
+            fq.join(timeout=5)
+        except Exception:
+            pass
+
+        worker.running = False
+        worker.join(timeout=1)
+
+        # Assertions
+
+        # 1. Assert Error Logging
+        Mocks["MockLogger"].warning.assert_called_once()
+        log_message = Mocks["MockLogger"].warning.call_args[0][0]
+        assert "Network Connection Lost" in log_message
+
+        # 2. Assert State and Queues
+        # The node should be marked as ERROR
+        assert fake_node.state == PipelineStateEnum.ERROR
+        assert pq.qsize() == 0  # Node should not move to process queue
+        assert fq.qsize() == 0  # Node was consumed, and no new links were added
+
+        # 3. Assert HTMLParser was NOT called
+        Mocks["MockHTMLParser"].assert_not_called()
 
 # # -------------------------
 # # PROCESSOR WORKER
@@ -151,36 +322,36 @@ def processor_worker_args(mock_input_queue, mock_output_queue, fake_tree, fake_r
         "fun_registry": fake_registry,
         "strict": True,
     }
-@pytest.fixture
-def patched_dependencies():
-    """Patches core logic and returns the mocks for assertion."""
-    with (
-        patch("src.workers.pipeline_workers.logger") as MockLogger,
-        patch("src.workers.pipeline_workers.HTMLParser") as MockHTMLParser,
-        patch("src.workers.pipeline_workers.PipelineTransformer") as MockPipelineTransformer,
-        patch("src.workers.pipeline_workers.LoaderObj") as MockLoaderObj,
-        patch("src.workers.pipeline_workers.get_enum_by_url") as MockGetEnumByUrl,
-        patch("src.workers.pipeline_workers.PipelineRegistries") as MockPipelineRegistries,
-    ):
-        # Configure the return values that simulate processing success
-
-        mock_html_parser_instance = MockHTMLParser.return_value
-        mock_html_parser_instance.get_content.return_value = {"page_data": "parsed"}
-
-        mock_transformer_instance = MockPipelineTransformer.return_value
-        mock_transformer_instance.transform_content.return_value = {"final_output": "data"}
-
-        MockLoaderObj.return_value = MagicMock()
-
-        yield {
-            "MockLogger": MockLogger,
-            "MockHTMLParser": MockHTMLParser,
-            "MockTransformer": MockPipelineTransformer,
-            "MockLoaderObj": MockLoaderObj,
-            "MockGetEnumByUrl": MockGetEnumByUrl,
-            "MockPipelineRegistries": MockPipelineRegistries,
-            "mock_transformer_instance": mock_transformer_instance,
-        }
+# @pytest.fixture
+# def patched_dependencies():
+#     """Patches core logic and returns the mocks for assertion."""
+#     with (
+#         patch("src.workers.pipeline_workers.logger") as MockLogger,
+#         patch("src.workers.pipeline_workers.HTMLParser") as MockHTMLParser,
+#         patch("src.workers.pipeline_workers.PipelineTransformer") as MockPipelineTransformer,
+#         patch("src.workers.pipeline_workers.LoaderObj") as MockLoaderObj,
+#         patch("src.workers.pipeline_workers.get_enum_by_url") as MockGetEnumByUrl,
+#         patch("src.workers.pipeline_workers.PipelineRegistries") as MockPipelineRegistries,
+#     ):
+#         # Configure the return values that simulate processing success
+#
+#         mock_html_parser_instance = MockHTMLParser.return_value
+#         mock_html_parser_instance.get_content.return_value = {"page_data": "parsed"}
+#
+#         mock_transformer_instance = MockPipelineTransformer.return_value
+#         mock_transformer_instance.transform_content.return_value = {"final_output": "data"}
+#
+#         MockLoaderObj.return_value = MagicMock()
+#
+#         yield {
+#             "MockLogger": MockLogger,
+#             "MockHTMLParser": MockHTMLParser,
+#             "MockTransformer": MockPipelineTransformer,
+#             "MockLoaderObj": MockLoaderObj,
+#             "MockGetEnumByUrl": MockGetEnumByUrl,
+#             "MockPipelineRegistries": MockPipelineRegistries,
+#             "mock_transformer_instance": mock_transformer_instance,
+#         }
 
 
 # --- 🧪 Test Class (Thread Execution Model) ---
@@ -240,7 +411,7 @@ class TestProcessorWorker:
         # Assert Transformation was called with the correct template
         transformer_template = {"title": mock_transformer_func}
         Mocks["mock_transformer_instance"].transform_content.assert_called_once_with(
-            transformer_template, {"page_data": "parsed"},
+            transformer_template, {"page_data": "parsed", "links": ["http://newlink.com/page.html?q=1"]},
         )
 
         # Final checks

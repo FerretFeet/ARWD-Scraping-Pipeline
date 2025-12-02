@@ -4,6 +4,7 @@ import threading
 import time
 from dataclasses import dataclass
 from queue import Empty, LifoQueue, Queue
+from urllib.parse import urlparse
 
 import psycopg
 
@@ -54,72 +55,99 @@ class CrawlerWorker(threading.Thread):
     def run(self) -> None:
         """Run the crawler worker."""
         while self.running:
+            node = None
             try:
-                # Get a node from the queue (blocks for 1 second)
+                # 1. Get Node (Blocks for 1 second)
                 node = self.fetch_queue.get(timeout=1)
                 print(f"[CRAWLER] Fetched node {node.id} with URL: {node.url}")
 
-                with node.lock:
-                    node.state = PipelineStateEnum.FETCHING
-                    print(f"[CRAWLER] Node {node.id} state set to FETCHING")
+                # 2. Process Node
+                try:
+                    with node.lock:
+                        node.state = PipelineStateEnum.FETCHING
+                        print(f"[CRAWLER] Node {node.id} state set to FETCHING")
 
-                    url = node.url
-                    if url:
-                        print(f"[CRAWLER] Fetching URL for Node ID {node.id}: {url}")
-                        base_url, url_stem = url.split("/", 1)
-                        print(f"[CRAWLER] Base URL: {base_url}, URL stem: {url_stem}")
+                        # --- Processing Logic ---
 
-                        html_text = self.crawler.get_page(url_stem)
-                        node.data["html"] = html_text
-                        print(f"[CRAWLER] Fetched HTML content for Node ID {node.id}")
+                        url = node.url
+                        if url:
+                            print(f"[CRAWLER] Fetching URL for Node ID {node.id}: {url}")
+                            # Assuming URL format allows splitting by first "/"
+                            parsed_url = urlparse(url)
+                            url_stem = parsed_url.path
 
-                        # Parse HTML for next links
-                        parser_url = url.split("?", 1)[0]
-                        print(f"[CRAWLER] Parsing HTML with URL {parser_url}")
+                            html_text = self.crawler.get_page(url_stem)
+                            node.data["html"] = html_text
+                            print(f"[CRAWLER] Fetched HTML content for Node ID {node.id}")
+                            # 2.1 Parse HTML for next links
+                            parser_url = url.split("?", 1)[0]
+                            print(f"PARSER URL = {parser_url}")
+                            html_parser = HTMLParser(strict=self.strict)
+                            parser_enum = get_enum_by_url(parser_url)
+                            print(f" parser enum is {parser_enum}")
+                            parsing_template = self.fun_registry.get_processor(
+                                parser_enum, PipelineRegistries.FETCH,
+                            )
+                            new_links = html_parser.get_content(parsing_template, html_text)
+                            print(f"[CRAWLER] Found new links: {new_links}")
 
-                        html_parser = HTMLParser(strict=self.strict)
+                            # 2.2 Queue New Links
+                            for key, item in new_links.items():
+                                if not item:
+                                    continue
+                                print(f"item is: {item}")
+                                if not isinstance(item, list):
+                                    item = [item]  # noqa: PLW2901
+                                for it in item:
+                                    print(f"it is {it}")
+                                    url_type = it.split("?", 1)[0]
+                                    print("error here?")
+                                    url_enum = get_enum_by_url(url_type)
+                                    print(f"making new node with {url_enum}")
+                                    new_node = self.state.add_node(
+                                        parent=node.id,
+                                        url=it,
+                                        state=PipelineStateEnum.AWAITING_FETCH,
+                                        node_type=url_enum,
+                                    )
+                                    self.fetch_queue.put(new_node)
+                                    print(f"[CRAWLER] Added new node {new_node.id} to fetch queue")
 
-                        parser_enum = get_enum_by_url(parser_url)
-                        parsing_template = self.fun_registry.get_processor(parser_enum, PipelineRegistries.FETCH)
+                            # 2.3 Finish processing the current node
+                            print("UPDATING STATE")
+                            node.state = PipelineStateEnum.AWAITING_PROCESSING
+                            print("STATE UPDATED")
+                            self.process_queue.put(node)
+                            print(f"[CRAWLER] Node {node.id} state set to AWAITING_PROCESSING")
 
-                        new_links = html_parser.get_content(parsing_template, html_text)
-                        print(f"[CRAWLER] Found new links: {new_links}")
+                # 3. Handle processing exceptions
+                except Exception as processing_error:
+                    # Set the state to ERROR if the node was successfully retrieved
+                    if node:
+                        node.state = PipelineStateEnum.ERROR
+                        logger.warning(f"[CRAWLER ERROR] Node ID {node.id}: {processing_error}")
+                    # Re-raise the error to be caught by the outer block for logging/flow control
+                    raise processing_error
 
-                        # Set up new links to fetch
-                        for key, item in new_links.items():
-                            if not item:
-                                continue
-                            if not isinstance(item, list):
-                                item = [item]  # noqa: PLW2901
-                            for it in item:
-                                print(f"[CRAWLER] Queuing new URL: {it}")
-                                url_type = it.split("?", 1)[0]
-                                url_enum = get_enum_by_url(url_type)
-                                new_node = self.state.add_node(
-                                    parent=node.id,
-                                    url=it,
-                                    state=PipelineStateEnum.AWAITING_FETCH,
-                                    node_type=url_enum,
-                                )
-                                self.fetch_queue.put(new_node)
-                                print(f"[CRAWLER] Added new node with ID {new_node.id} to fetch queue")
-
-                        # Finish processing the node
-                        node.state = PipelineStateEnum.AWAITING_PROCESSING
-                        self.process_queue.put(node)
-                        print(f"[CRAWLER] Node {node.id} state set to AWAITING_PROCESSING")
-
+                # 4. Final Cleanup (Always called if node was retrieved)
+                finally:
+                    # 🟢 CRITICAL: Ensure task_done is called exactly once here.
                     self.fetch_queue.task_done()
-                    time.sleep(2)  # Sleep so don't flood web server
+                    print(f"Node {node.id} task done.")
+
+                # Optional: Sleep outside the lock for throttling
+                time.sleep(0.2)
 
             except Empty:
-                # If queue is empty, break if the system should shut down,
-                # or continue if waiting for new jobs (as we do here).
-                continue
+                # Queue timed out (empty)
+                time.sleep(0.2)
+                continue  # Go back to the top of the while loop
+
             except Exception as e:
-                msg = f"[CRAWLER ERROR] Node ID {node.id}: {e}"
-                logger.warning(msg)
-                continue
+                # Handles exceptions from queue.get() or re-raised exceptions from processing
+                if not node:
+                    logger.error(f"[CRAWLER FATAL] Error during queue get: {e}")
+
 class ProcessorWorker(threading.Thread):
     """Thread to consume the processor queue and handle internal data processing."""
 
@@ -178,25 +206,20 @@ class ProcessorWorker(threading.Thread):
                                 if key != "state_key"
                         }
                         get_state_fun = parsing_templates.get("state_key", [None])[0]
-                        print(f"STATE FUN:: {get_state_fun}")
 
                         state_dict = {} if not get_state_fun else get_state_fun(node, self.state)
-                        print(f"state dict = {state_dict}")
 
                         parsed_data = html_parser.get_content(selector_template, node.data["html"])
-                        print("data parsed")
                         parsed_data.update(state_dict)
                         keys = state_dict.keys()
                         state_transform = {}
                         for key in keys:
                             state_transform.update({key: parsing_templates.get("state_key", None)[1]})
                         transformer_template.update(state_transform)
-                        print(f"parsed_data = {parsed_data}")
                         transformer = PipelineTransformer(strict=self.strict)
                         transformed_data = transformer.transform_content(
                             transformer_template, parsed_data,
                         )
-                        print(f"transformed data = {transformed_data}")
                         if isinstance(transformed_data, list):
                             transformed_data = transformed_data[0]
                         if isinstance(transformed_data, dict):
@@ -207,7 +230,6 @@ class ProcessorWorker(threading.Thread):
                             loader_obj = LoaderObj(
                                 node=node, name=node.type, params={"item": transformed_data},
                             )
-                        print(f"loader_obj = {loader_obj}")
 
                         node.state = PipelineStateEnum.AWAITING_LOAD
                         self.output_queue.put(loader_obj)
@@ -215,7 +237,6 @@ class ProcessorWorker(threading.Thread):
                             f"[PROCESSOR] Node {node.id} state set to AWAITING_LOAD,"
                             f"LoaderObj put in output queue",
                         )
-                        print("fin")
 
                 except Exception as inner_e:
                     # 🚨 FIX: Revert state to FAILED/ERROR if processing fails
@@ -229,7 +250,6 @@ class ProcessorWorker(threading.Thread):
                 finally:
                     # 🚨 FIX: Ensure task_done() is always called after processing a fetched node
                     self.input_queue.task_done()
-                    print("task done")
 
             except Empty:
                 # Only sleep and continue if the queue was empty (timeout hit)

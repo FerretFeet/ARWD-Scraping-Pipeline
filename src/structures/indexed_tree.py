@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class PipelineStateEnum(IntEnum):
     """Enum for pipeline states."""
 
+    ERROR = -1
     CREATED = 0
     AWAITING_FETCH = 1
     FETCHING = 2
@@ -25,7 +26,7 @@ class PipelineStateEnum(IntEnum):
     PROCESSING = 4
     AWAITING_LOAD = 5
     LOADING = 6
-    COMPLETED = 6
+    COMPLETED = 7
 
 
 class Node:
