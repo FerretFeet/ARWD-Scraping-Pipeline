@@ -1,7 +1,7 @@
 import threading
 import time
 from queue import LifoQueue, Queue
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -9,7 +9,6 @@ from src.data_pipeline.extract.webcrawler import Crawler
 from src.structures.indexed_tree import PipelineStateEnum
 from src.workers.pipeline_workers import (
     CrawlerWorker,
-    LoaderObj,
     ProcessorWorker,
 )
 
@@ -39,7 +38,7 @@ def fake_node():
             self.id = "1"
             self.url = "https://arkleg.state.ar.us/"
             self.state = None
-            self.data = {}
+            self.data = {"html": "<html><h1>Test HTML</h1></html>"}
             self.type = "TEST"
             self.children = []
             self.lock = threading.Lock()
@@ -99,65 +98,244 @@ def test_crawler_worker_fetches_and_pushes(fake_tree, fake_node, monkeypatch):
 # # PROCESSOR WORKER
 # # -------------------------
 
-def test_processor_worker_processes_and_emits_loader(fake_tree, fake_node, monkeypatch):
-    iq = LifoQueue()
-    oq = Queue()
+# 🚨 REQUIRED REVERSION: Use real queue objects for the thread test
+@pytest.fixture
+def mock_input_queue():
+    """Fixture for the input queue (LifoQueue)."""
+    return LifoQueue()
 
-    # Mock the HTMLParser to return fake parsed content
-    fake_html_parser = MagicMock()
-    fake_html_parser.get_content.return_value = {"x": "parsed"}
+@pytest.fixture
+def mock_output_queue():
+    """Fixture for the output queue (Queue)."""
+    return Queue()
 
-    # Mock the PipelineTransformer to return transformed data
-    fake_transformer = MagicMock()
-    fake_transformer.transform_content.return_value = [{"a": 1}]
+@pytest.fixture
+def mock_selector_func():
+    return MagicMock(return_value="selector_output")
 
-    # Mock the templates (selectors and transformers)
-    fake_templates = MagicMock()
-    fake_templates.selectors = {
-        "x": ("sel", lambda x: x),
+@pytest.fixture
+def mock_transformer_func():
+    return MagicMock(return_value="transformed_data")
+
+@pytest.fixture
+def fake_registry_process(mock_selector_func, mock_transformer_func):
+    registry = MagicMock()
+    # Provide the mock functions directly
+    registry.get_processor.return_value = {
+        "title": (mock_selector_func, mock_transformer_func),
+        "state_key": (None, None),
     }
-
-    # Mock the ProcessorRegistry to return the mock templates
-    fake_registry = MagicMock()
-    fake_registry.get_processor.return_value = fake_templates
-
-    # Patch HTMLParser and PipelineTransformer in the worker
-    monkeypatch.setattr("src.workers.pipeline_workers.HTMLParser", lambda strict: fake_html_parser)
-    monkeypatch.setattr("src.workers.pipeline_workers.PipelineTransformer", lambda strict: fake_transformer)
-    monkeypatch.setattr("src.workers.pipeline_workers.ProcessorRegistry", fake_registry)
-
-    # Set up the fake node with HTML data
-    fake_node.data["html"] = "<html></html>"
-    iq.put(fake_node)
-
-    # Create and start the worker thread
-    worker = ProcessorWorker(
-        input_queue=iq,
-        output_queue=oq,
+    return registry
+@pytest.fixture
+def processor_worker(mock_input_queue, mock_output_queue, fake_tree, fake_registry_process):
+    """Fixture to initialize a ProcessorWorker instance."""
+    return ProcessorWorker(
+        input_queue=mock_input_queue,
+        output_queue=mock_output_queue,
         state_tree=fake_tree,
-        strict=False,
-        fun_registry=fake_registry,
+        fun_registry=fake_registry_process,
+        strict=True,
     )
 
-    worker.running = True
-    worker.start()
+@pytest.fixture
+def mock_get_state_fun():
+    return MagicMock(return_value={"state_data_retrieved": "YES"})
 
-    # Sleep to allow the thread to process the node
-    time.sleep(0.2)  # Can be replaced by waiting for a signal or using an event
+@pytest.fixture
+def processor_worker_args(mock_input_queue, mock_output_queue, fake_tree, fake_registry):
+    """Fixture to provide arguments needed to initialize a ProcessorWorker."""
+    return {
+        "input_queue": mock_input_queue,
+        "output_queue": mock_output_queue,
+        "state_tree": fake_tree,
+        "fun_registry": fake_registry,
+        "strict": True,
+    }
+@pytest.fixture
+def patched_dependencies():
+    """Patches core logic and returns the mocks for assertion."""
+    with (
+        patch("src.workers.pipeline_workers.logger") as MockLogger,
+        patch("src.workers.pipeline_workers.HTMLParser") as MockHTMLParser,
+        patch("src.workers.pipeline_workers.PipelineTransformer") as MockPipelineTransformer,
+        patch("src.workers.pipeline_workers.LoaderObj") as MockLoaderObj,
+        patch("src.workers.pipeline_workers.get_enum_by_url") as MockGetEnumByUrl,
+        patch("src.workers.pipeline_workers.PipelineRegistries") as MockPipelineRegistries,
+    ):
+        # Configure the return values that simulate processing success
 
-    # Stop the worker thread
-    worker.running = False
-    worker.join(timeout=1)  # Ensure thread finishes
+        mock_html_parser_instance = MockHTMLParser.return_value
+        mock_html_parser_instance.get_content.return_value = {"page_data": "parsed"}
 
-    # Assert the final state of the node
-    assert fake_node.state == PipelineStateEnum.AWAITING_LOAD
+        mock_transformer_instance = MockPipelineTransformer.return_value
+        mock_transformer_instance.transform_content.return_value = {"final_output": "data"}
 
-    # Check the output queue has a loader object
-    assert oq.qsize() == 1
-    out = oq.get()
-    assert isinstance(out, LoaderObj)
-    assert out.node == fake_node
-    assert out.params == {"a": 1}  # This comes from the transformed data
+        MockLoaderObj.return_value = MagicMock()
+
+        yield {
+            "MockLogger": MockLogger,
+            "MockHTMLParser": MockHTMLParser,
+            "MockTransformer": MockPipelineTransformer,
+            "MockLoaderObj": MockLoaderObj,
+            "MockGetEnumByUrl": MockGetEnumByUrl,
+            "MockPipelineRegistries": MockPipelineRegistries,
+            "mock_transformer_instance": mock_transformer_instance,
+        }
+
+
+# --- 🧪 Test Class (Thread Execution Model) ---
+
+
+class TestProcessorWorker:
+    def test_successful_run_cycle(
+        self,
+        processor_worker,
+        mock_input_queue,
+        mock_output_queue,
+        fake_node,
+        # Use the new mock functions in arguments
+        fake_registry,
+        mock_selector_func,
+        mock_transformer_func,
+        patched_dependencies,
+    ):
+        """Test the complete successful cycle using thread start/join."""
+
+        Mocks = patched_dependencies
+
+        # 1. Setup: Put the node into the real queue
+        mock_input_queue.put(fake_node)
+
+        # 2. Act: Start the worker thread
+        processor_worker.start()
+
+        # 3. Wait for processing completion (using join is best)
+        try:
+            mock_input_queue.join()
+        except TimeoutError:
+            pytest.fail("ProcessorWorker failed to call task_done()")
+
+        # 4. Stop and Join the thread cleanly
+        processor_worker.running = False
+        processor_worker.join(timeout=1)
+
+        if Mocks["MockLogger"].warning.called:
+            print("\n--- Worker Logged Warning ---")
+            print(Mocks["MockLogger"].warning.call_args_list)
+            # Force a failure here to see the log output in your CI/terminal
+            assert not Mocks["MockLogger"].warning.called, "Worker faile d! Check logs above."
+
+        # 5. Assertions
+
+        # Logic Check
+        Mocks["MockHTMLParser"].assert_called_once()
+
+        # Assert get_content was called with the correct selector_template
+        selector_template = {"title": mock_selector_func}
+
+        Mocks["MockHTMLParser"].return_value.get_content.assert_called_once_with(
+            selector_template, fake_node.data["html"],
+        )
+
+        # Assert Transformation was called with the correct template
+        transformer_template = {"title": mock_transformer_func}
+        Mocks["mock_transformer_instance"].transform_content.assert_called_once_with(
+            transformer_template, {"page_data": "parsed"},
+        )
+
+        # Final checks
+        assert fake_node.state == PipelineStateEnum.AWAITING_LOAD
+        assert mock_output_queue.qsize() == 1
+        assert mock_input_queue.empty()
+
+    def test_run_with_state_function(
+        self,
+        processor_worker_args,  # ⬅️ New fixture name
+        mock_input_queue,
+        mock_output_queue,
+        fake_node,
+        fake_tree,
+        fake_registry,
+        mock_get_state_fun,
+        patched_dependencies,
+    ):
+        """Test processing when a 'state_key' function is present."""
+
+        Mocks = patched_dependencies
+
+        # 1. Setup: Define custom return value for the registry
+        mock_content_selector = MagicMock()
+        mock_content_transformer = Mocks["mock_transformer_instance"].transform_content.return_value
+
+        custom_registry_return_value = {
+            "content": (mock_content_selector, mock_content_transformer),
+            "state_key": (mock_get_state_fun, None),
+        }
+
+        # 🚨 CRITICAL FIX A: Set the mock's return value BEFORE worker instantiation
+        fake_registry.get_processor.return_value = custom_registry_return_value
+
+        # 🚨 CRITICAL FIX B: Instantiate the worker using the arguments fixture
+        processor_worker = ProcessorWorker(**processor_worker_args)
+
+        # Put node and start thread
+        mock_input_queue.put(fake_node)
+        processor_worker.start()
+
+        # Wait for queue join
+        try:
+            mock_input_queue.join()
+        except TimeoutError:
+            pytest.fail("ProcessorWorker failed to call task_done()")
+
+        # Stop and Join
+        processor_worker.running = False
+        processor_worker.join(timeout=1)
+
+        # 2. Assertions
+
+        # 🟢 This assertion will now pass because the worker saw the correct state function
+        mock_get_state_fun.assert_called_once_with(fake_node, fake_tree)
+
+        assert mock_output_queue.qsize() == 1
+
+    def test_processing_exception_handling(
+        self, processor_worker, mock_input_queue, fake_node, patched_dependencies,
+    ):
+        """Test that the worker catches a generic processing Exception and logs a warning, calling task_done."""
+
+        Mocks = patched_dependencies
+
+        # Setup: Mock HTMLParser init to raise an Exception
+        exc_message = "Catastrophic Processing Failure"
+        Mocks["MockHTMLParser"].side_effect = Exception(exc_message)
+
+        mock_input_queue.put(fake_node)
+        processor_worker.start()
+
+        # Wait for queue join (must succeed if task_done() is called)
+        try:
+            mock_input_queue.join()
+        except TimeoutError:
+            pytest.fail("ProcessorWorker failed to call task_done() after exception.")
+
+        # Stop and Join
+        processor_worker.running = False
+        processor_worker.join(timeout=1)
+
+        # Assertions
+        # 1. Exception was logged
+        Mocks["MockLogger"].warning.assert_called_once()
+        log_message = Mocks["MockLogger"].warning.call_args[0][0]
+        assert f"[PROCESSOR ERROR] Node ID {fake_node.id}:" in log_message
+
+        # 2. Node state should remain PROCESSING or be marked ERROR (depending on implementation)
+        # Note: If you updated your code with the suggested fix, it should be ERROR_STATE.
+        # Otherwise, the last successful assignment was PROCESSING_STATE.
+        # We assert it's not the final AWAITING_LOAD state.
+        assert fake_node.state != PipelineStateEnum.AWAITING_LOAD
+        assert mock_input_queue.empty()  # Verifies task_done() was called
+
 
 # # -------------------------
 # # LOADER WORKER

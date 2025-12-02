@@ -4,6 +4,7 @@ import re
 
 from bs4 import BeautifulSoup
 
+from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.models.selector_template import SelectorTemplate
@@ -32,6 +33,11 @@ class BillVoteSelector(SelectorTemplate):
                 "excused_voters": (
                     _VoteListParsers.parse_excused_names,
                     normalize_list_of_str_link,
+                ),
+                "dynamic_state_example": (
+                    lambda node, state_tree: self.get_dynamic_state(node, state_tree,
+                                                        {"bill_id": None}, None),
+                    empty_transform,
                 ),
             },
         )
