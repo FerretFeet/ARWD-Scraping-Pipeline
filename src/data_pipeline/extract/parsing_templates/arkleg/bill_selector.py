@@ -5,29 +5,48 @@ import re
 
 from bs4 import BeautifulSoup
 
+from src.data_pipeline.extract.fetching_templates.arkleg_fetchers import registry
+from src.data_pipeline.transform.utils.empty_transform import empty_transform
+from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
+from src.data_pipeline.transform.utils.normalize_str import normalize_str
+from src.data_pipeline.transform.utils.transform_str_to_date import transform_str_to_date
 from src.models.selector_template import SelectorTemplate
+from src.structures.registries import PipelineRegistries, PipelineRegistryKeys
 
 
+@registry.register(PipelineRegistryKeys.BILL, PipelineRegistries.PROCESS)
 class BillSelector(SelectorTemplate):
     """Selector for Arkleg bill page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
-            url=url,
             selectors={
-                "title": ("div h1"),
-                "bill_no": _BillParsers.parse_bill_no,
-                "bill_no_dwnld": _BillParsers.parse_bill_no_dwnld,
-                "act_no": _BillParsers.parse_act_no,
-                "act_no_dwnld": _BillParsers.parse_act_no_dwnld,
-                "orig_chamber": _BillParsers.parse_orig_chamber,
-                "lead_sponsor": _BillParsers.parse_lead_sponsor,
-                "other_primary_sponsor": _BillParsers.parse_other_primary_sponsor,
-                "cosponsors": _BillParsers.parse_cosponsors,
-                "intro_date": _BillParsers.parse_intro_date,
-                "act_date": _BillParsers.parse_act_date,
-                "vote_links": _BillParsers.parse_vote_links,
+                "title": ("div h1", normalize_str),
+                "bill_no": (
+                    _BillParsers.parse_bill_no,
+                    lambda bill_no, *, strict: (
+                        normalize_str(bill_no, strict=strict, remove_substr="PDF")
+                    ),
+                ),
+                "bill_no_dwnld": (_BillParsers.parse_bill_no_dwnld, empty_transform),
+                "act_no": (
+                    _BillParsers.parse_act_no,
+                    lambda bill_no, *, strict: (
+                        normalize_str(bill_no, strict=strict, remove_substr="PDF")
+                    ),
+                ),
+                "act_no_dwnld": (_BillParsers.parse_act_no_dwnld, empty_transform),
+                "orig_chamber": (_BillParsers.parse_orig_chamber, normalize_str),
+                "lead_sponsor": (_BillParsers.parse_lead_sponsor, normalize_list_of_str_link),
+                "other_primary_sponsor": (
+                    _BillParsers.parse_other_primary_sponsor,
+                    normalize_list_of_str_link,
+                ),
+                "cosponsors": (_BillParsers.parse_cosponsors, normalize_list_of_str_link),
+                "intro_date": (_BillParsers.parse_intro_date, transform_str_to_date),
+                "act_date": (_BillParsers.parse_act_date, transform_str_to_date),
+                "vote_links": (_BillParsers.parse_vote_links, empty_transform),
             },
         )
 

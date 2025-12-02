@@ -4,26 +4,36 @@ import re
 
 from bs4 import BeautifulSoup
 
+from src.data_pipeline.extract.fetching_templates.arkleg_fetchers import registry
+from src.data_pipeline.transform.utils.cast_to_int import cast_to_int
+from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
+from src.data_pipeline.transform.utils.normalize_str import normalize_str
+from src.data_pipeline.transform.utils.transform_leg_title import transform_leg_title
+from src.data_pipeline.transform.utils.transform_phone import transform_phone
 from src.models.selector_template import SelectorTemplate
+from src.structures.registries import PipelineRegistries, PipelineRegistryKeys
 from src.utils.logger import logger
 
 
+@registry.register(PipelineRegistryKeys.LEGISLATOR, PipelineRegistries.PROCESS)
 class LegislatorSelector(SelectorTemplate):
     """Selector template for Arkleg legislator page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
-            url=url,
             selectors={
-                "title": ("div h1"),
-                "phone": _LegislatorParsers.parse_phone,
-                "email": _LegislatorParsers.parse_email,
-                "address": ("h1 + p"),
-                "district": _LegislatorParsers.parse_district,
-                "seniority": _LegislatorParsers.parse_seniority,
-                "public_service": _LegislatorParsers.parse_public_service,
-                "committees": _LegislatorParsers.get_committees_names_links,
+                "title": ("div h1", transform_leg_title),
+                "phone": (_LegislatorParsers.parse_phone, transform_phone),
+                "email": (_LegislatorParsers.parse_email, normalize_str),
+                "address": ("h1 + p", normalize_str),
+                "district": (_LegislatorParsers.parse_district, cast_to_int),
+                "seniority": (_LegislatorParsers.parse_seniority, cast_to_int),
+                "public_service": (_LegislatorParsers.parse_public_service, normalize_str),
+                "committees": (
+                    _LegislatorParsers.get_committees_names_links,
+                    normalize_list_of_str_link,
+                ),
             },
         )
 
