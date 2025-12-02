@@ -6,12 +6,9 @@ from src.models.selector_template import SelectorTemplate
 class BillListSelector(SelectorTemplate):
     """Selector for Arkleg BillList Page."""
 
-    next_page: str
-
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
-            url=url,
             selectors={
                 "chamber": ("div h1"),
                 "session": ("option[selected]"),

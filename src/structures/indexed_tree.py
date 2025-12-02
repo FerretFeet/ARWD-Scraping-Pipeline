@@ -84,6 +84,7 @@ class Node:
             f"Node(id={self.id}, state={self.state.name}, "
             f"children={[child.id for child in self.children]}, "
             f"parent={self.parent.id if self.parent else "None"}, type={self.type}, url={self.url})"
+            f", data={self.data}"
         )
 
 
@@ -202,14 +203,32 @@ class IndexedTree:
     ) -> Node | None:
         should_visit = True
         if not node: return None
+        print("Searching for filter")
         if data_attrs and node:
             for key, value in data_attrs.items():
-                if key not in node.data or (value and node.data[key] != value):
+                if key not in node.data:
+                    print("key not in")
+                    should_visit = False
+                    return None
+                node_value = node.data[key]
+                print(f"nodeval is {node_value}")
+                print(f"Value is {value} {value!r} {value is None}")
+                if value is not None and node_value != value:
+                    print("value fail")
                     should_visit = False
                     return None
         if node_attrs and node:
+            print("searching node attrs")
             for key, value in node_attrs.items():
-                if value and getattr(node, key, None) != value:
+                if key not in node.__dict__:
+                    print(f"key not in:: {key},,,, {node.__dict__}")
+                    should_visit = False
+                    return None
+                node_value = getattr(node, key)
+                print(f"nodeval = {node_value}")
+                if value is not None and node_value != value:
+                    print(f"filter set false for nodeattrs {node.__dict__}, {node_attrs}")
+
                     should_visit = False
                     return None
         return node if should_visit else None
@@ -283,29 +302,46 @@ class IndexedTree:
 
         return result
 
-    def find_val_ancestor(
+    def find_val_in_ancestor(
         self,
         node: int | Node,
-        attr: str,
-        value: str | None = None,
-    ) -> Node | None:
-        """Return an ancestor with a specified .data attr or value."""
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+    ) -> dict | None:
+        """
+        Find an ancestor with a specified .data attr or value.
+
+        Args:
+            node is a IndexedTree node or node id
+            data_attrs is a dict of key and optional values to match a node's data attribute.
+            node_attrs is a dict of key and optional values to match a node's direct attributes.
+
+        Returns:
+            A dict of key:val for all given keys for the first node which matches all given keys
+                and optionally values.
+
+        """
         if isinstance(node, int):
             node = self.find_node(node)
-            if not node.parent:
-                return None
+        print(f"Finding ancestor: {node}")
+        if self.__traversal_filter(node, data_attrs=data_attrs, node_attrs=node_attrs):
+            print(f"Found ancestor: {node}")
+            dattrs = nattrs = {}
+            if data_attrs:
 
-        parent = node.parent
-        if not parent: return None
-        target = parent.data.get(attr, None)
+                dattrs = {key: node.data[key] for key in data_attrs}
+                print(f"Data attrs: {dattrs} made from {[key for key in dattrs]})")
+            if node_attrs:
+                print("Should not see this line")
+                nattrs = {key: getattr(node, key) for key in node_attrs}
+            print(f"nattrs: {nattrs}, dattrs: {dattrs}")
+            dattrs.update(nattrs)
+            print(f"Result: {dattrs}")
+            return dattrs
 
-        if target:
-            if not value:
-                return parent
-            if value and value == target:
-                return parent
-
-        return self.find_val_ancestor(parent, attr, value)
+        if not node.parent: return None
+        print("Trying new ancestor")
+        return self.find_val_in_ancestor(node.parent, data_attrs, node_attrs)
 
     # --- Serialization Methods ---
 

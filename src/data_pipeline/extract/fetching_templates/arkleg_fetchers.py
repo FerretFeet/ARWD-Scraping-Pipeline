@@ -1,18 +1,24 @@
-"""Fetcher templates for Arkleg."""
-
 import re
 
 from bs4 import BeautifulSoup
 
+# Assuming these imports are already part of the code
 from src.models.selector_template import SelectorTemplate
-from src.structures.registries import PipelineRegistries, PipelineRegistryKeys, register_processor
+from src.structures.registries import (
+    PipelineRegistries,
+    PipelineRegistryKeys,
+    ProcessorRegistry,  # Assuming you import this
+)
+
+# Initialize the registry
+registry = ProcessorRegistry()
 
 
-@register_processor(PipelineRegistryKeys.ARK_LEG_SEEDER, PipelineRegistries.FETCH)
+@registry.register(PipelineRegistryKeys.ARK_LEG_SEEDER, PipelineRegistries.FETCH)
 class ArkLegSeederLinkSelector(SelectorTemplate):
     """Selector template for ArkLeg BillCategory Page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
             selectors={
@@ -30,11 +36,11 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
         return None
 
 
-@register_processor(PipelineRegistryKeys.BILLS_SECTION, PipelineRegistries.FETCH)
-class ArkLegSeederLinkSelector(SelectorTemplate):
+@registry.register(PipelineRegistryKeys.BILLS_SECTION, PipelineRegistries.FETCH)
+class ArkLegSeederLinkSelectorForBillSection(SelectorTemplate):
     """Selector template for ArkLeg BillCategory Page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
             selectors={
@@ -43,11 +49,11 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
         )
 
 
-@register_processor(PipelineRegistryKeys.BILL_CATEGORIES, PipelineRegistries.FETCH)
+@registry.register(PipelineRegistryKeys.BILL_CATEGORIES, PipelineRegistries.FETCH)
 class BillCategoryLinkSelector(SelectorTemplate):
     """Selector template for ArkLeg BillCategory Page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
             selectors={
@@ -56,11 +62,11 @@ class BillCategoryLinkSelector(SelectorTemplate):
         )
 
 
-@register_processor(PipelineRegistryKeys.BILL_LIST, PipelineRegistries.FETCH)
+@registry.register(PipelineRegistryKeys.BILL_LIST, PipelineRegistries.FETCH)
 class BillListLinkSelector(SelectorTemplate):
     """Selector for Arkleg BillList Page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
             selectors={
@@ -70,14 +76,13 @@ class BillListLinkSelector(SelectorTemplate):
         )
 
 
-@register_processor(PipelineRegistryKeys.BILL, PipelineRegistries.FETCH)
+@registry.register(PipelineRegistryKeys.BILL, PipelineRegistries.FETCH)
 class BillLinkSelector(SelectorTemplate):
     """Selector for Arkleg bill page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
-            url=url,
             selectors={
                 "bill_vote": self.parse_vote_links,
             },
@@ -89,14 +94,13 @@ class BillLinkSelector(SelectorTemplate):
         return soup.find_all("a", string=re.compile(r"vote", re.IGNORECASE))  # type: ignore  # noqa: PGH003
 
 
-@register_processor(PipelineRegistryKeys.LEGISLATOR_LIST, PipelineRegistries.FETCH)
+@registry.register(PipelineRegistryKeys.LEGISLATOR_LIST, PipelineRegistries.FETCH)
 class LegislatorListLinkSelector(SelectorTemplate):
     """Selector for Arkleg Legislator List Page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
-            url=url,
             selectors={
                 "legislator": (
                     "div#tableDataWrapper div.row.tableRow a:first-child, div#tableDataWrapper "

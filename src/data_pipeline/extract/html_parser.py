@@ -1,7 +1,6 @@
 """Class to parse html.text using beautiful soup selectors."""
 from bs4 import BeautifulSoup
 
-from src.models.selector_template import SelectorTemplate
 from src.utils.logger import logger
 
 
@@ -13,12 +12,7 @@ class HTMLParser:
         self.strict = strict
 
     def safe_get(self, soup: BeautifulSoup, selector: str, attr: str = "text") -> list[str] | None:
-        """
-        Get a specified attribute from a beautiful soup object using a CSS selector.
-
-        Selects text attribute of element by default
-        Returns None on failure or a List of Strings on success
-        """
+        """Safely run CSS selectors and return either text or attribute values."""
         if (
             not isinstance(soup, BeautifulSoup)
             or not isinstance(selector, str)
@@ -38,7 +32,9 @@ class HTMLParser:
             msg = f"[safe_get] No matches found for selector '{selector}'"
             logger.warning(msg)
             return None
+
         values: list[str] = []
+
         for elem in selected_elems:
             if attr == "text":
                 values.append(elem.text)
@@ -54,7 +50,7 @@ class HTMLParser:
 
     def get_content(
         self,
-        template: SelectorTemplate,
+        template: dict,
         html_text: str,
     ) -> dict[str, str | list[str] | None | dict[str, str | list[str] | None]]:
         """
@@ -64,7 +60,9 @@ class HTMLParser:
         - key: (selector, attr, label) -> For simple, declarative scraping
         - key: callable_function(soup)      -> For complex, imperative scraping
         """
-        if not isinstance(template, SelectorTemplate) or not isinstance(html_text, str):
+        logger.info("Html parser start")
+
+        if not isinstance(template, dict) or not isinstance(html_text, str):
             message = (
                 f"Parameter passed of incorrect type:\n"
                 f"website: {type(template)}, path: {type(html_text)}"
@@ -73,9 +71,10 @@ class HTMLParser:
             raise TypeError(message)
         content_holder: dict = {}
         soup = BeautifulSoup(html_text, "html.parser")
+        logger.info("Html parser running")
 
         if soup:
-            for key, val in template.selectors.items():
+            for key, val in template.items():
                 if callable(val):
                     # If selector is a helper function
                     try:

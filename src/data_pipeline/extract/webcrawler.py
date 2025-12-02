@@ -1,22 +1,25 @@
 """Web Crawler for requesting and parsing HTML content."""
+import time
 
-from bs4 import BeautifulSoup
 from requests import RequestException, Session
 
 from src.config.settings import config
-from src.models.selector_template import SelectorTemplate
 from src.utils.logger import logger
 
 
 class Crawler:
     """Web Crawler for requesting and parsing HTML content."""
 
-    def __init__(self, site: str, *, strict: bool | None = None) -> None:
+    def __init__(self, site: str, *, strict: bool | None = None, max_retries: int = 3,
+        retry_backoff: float = 0.5) -> None:
         """Initialize the Crawler with domain base-url and optional strict parameter."""
         self.site = site
         self.strict = config["strict"] if strict is None else strict
         self.session = Session()
         self.session_counter = 0
+
+        self.max_retries = max_retries
+        self.retry_backoff = retry_backoff
 
     def increment_session(self) -> None:
         """Reset the session after 100 requests."""
@@ -26,117 +29,37 @@ class Crawler:
             self.session = Session()
 
     def get_page(self, url: str) -> str:
-        """Make an http request and return a beautiful soup object of the page."""
-        try:
-            html = self.session.get(url)
-            html.raise_for_status()  # Raise an exception for bad responses (4xx, 5xx)
-
-        except (RequestException, Exception) as e:
-            # Propagate network/HTTP errors as a specific application exception
-            message = f"Failed to fetch URL {url}: {e}"
-            logger.error(message)
-            raise ConnectionError(message) from e
+        """Fetch a URL with automatic retries and return HTML text."""
         self.increment_session()
-        return html.text
+        last_exc = None
 
-    def safe_get(self, soup: BeautifulSoup, selector: str, attr: str = "text") -> list[str] | None:
-        """
-        Get a specified attribute from a beautiful soup object using a CSS selector.
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                html = self.session.get(url)
+                html.raise_for_status()
 
-        Selects text attribute of element by default
-        Returns None on failure or a List of Strings on success
-        """
-        if (
-            not isinstance(soup, BeautifulSoup)
-            or not isinstance(selector, str)
-            or not isinstance(attr, str)
-        ):
-            message = (
-                f"Parameter passed of incorrect type: \n"
-                f"soup (bs4): {type(soup)}, selector (str): {type(selector)}, "
-                f"attr (str): {type(attr)}"
-            )
-            logger.error(message)
-            raise TypeError(message)
+            except (RequestException, Exception) as e:
+                last_exc = e
 
-        selected_elems = soup.select(selector)
-
-        if not selected_elems:
-            msg = f"[safe_get] No matches found for selector '{selector}'"
-            logger.warning(msg)
-            return None
-        values: list[str] = []
-        for elem in selected_elems:
-            if attr == "text":
-                values.append(elem.text)
-            elif elem.has_attr(attr):
-                values.append(elem.get(attr))
-            else:
-                message = f'Element "{elem}" does not have attribute "{attr}"'
-                logger.warning(message)
-                if self.strict:
-                    raise AttributeError(message)
-                continue
-        return values if values else None
-
-    def get_content(
-        self,
-        template: SelectorTemplate,
-        path: str,
-        session: Session = None,
-    ) -> dict[str, str | list[str] | None | dict[str, str | list[str] | None]]:
-        """
-        Request a page and return the parsed content.
-
-        The 'template.selectors' dict can contain:
-        - key: (selector, attr, label) -> For simple, declarative scraping
-        - key: callable_function(soup)      -> For complex, imperative scraping
-        """
-        if not isinstance(template, SelectorTemplate) or not isinstance(path, str):
-            message = (
-                f"Parameter passed of incorrect type:\n"
-                f"website: {type(template)}, path: {type(path)}"
-            )
-            logger.error(message)
-            raise TypeError(message)
-
-        page_url = template.url + path
-        content_holder = {}
-        session_flag = session is None
-        session = session or Session()
-        soup = self.get_page(session, page_url)
-        if soup:
-            for key, val in template.selectors.items():
-                if callable(val):
-                    # If selector is a helper function
-                    try:
-                        data = val(soup)
-                        if not isinstance(data, list) and data is not None:
-                            data = [data]
-                        content_holder[key] = data
-                    except (AttributeError, Exception) as e:  # noqa: BLE001
-                        logger.warning(f"Error running custom parser for '{key}': {e}")
-                        content_holder[key] = None
-
+                if attempt < self.max_retries:
+                    sleep_for = self.retry_backoff * attempt
+                    logger.warning(
+                        f"[CRAWLER] Failed to fetch {url} "
+                        f"(attempt {attempt}/{self.max_retries}): {e} "
+                        f"— retrying in {sleep_for:.2f}s",
+                    )
+                    time.sleep(sleep_for)
                 else:
-                    selector = attr = None
-                    # --- STRATEGY 2: Rule is a simple tuple or str---
-                    if isinstance(val, tuple):
-                        if len(val) == 1:
-                            selector = str(val[0])
-                        elif len(val) == 2:  # noqa: PLR2004
-                            selector, attr = val
-                        else:
-                            msg = f"Too many values input to selector tuple: \n {key}:  {val}"
-                            logger.error(msg)
-                            raise ValueError(msg)
-                    else:
-                        selector = val
-                    args = [selector] if attr is None else [selector, attr]
-                    content_holder[key] = self.safe_get(soup, *args)
+                    # Final attempt failed → now treated as fatal
+                    message = (
+                        f"Failed to fetch URL {url} after {self.max_retries} attempts: {e}"
+                    )
+                    logger.error(message)
+                    raise ConnectionError(message) from e
+            else:
+                return html.text  # SUCCESS
 
-        content_holder["rel_url"] = path
-        content_holder["base_url"] = template.url
-        session.close() if session_flag else None
-        logger.info("\nCrawler executed and retrieved content")
-        return content_holder
+
+        # Should never reach here
+        msg = f"Unknown error while fetching {url}"
+        raise ConnectionError(msg) from last_exc

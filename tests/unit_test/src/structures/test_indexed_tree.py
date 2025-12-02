@@ -255,6 +255,12 @@ def test_traversal_filtering(simple_tree):
     assert len(result) == 1
     assert result[0].data["val"] == "child1"
 
+    result = simple_tree.reverse_in_order_traversal(
+        node_attrs={"url": "http://root"},
+    )
+    assert len(result) == 1
+    assert result[0].url == "http://root"
+
 def test_find_val_ancestor(empty_tree):
     # Root (val=Target) -> Middle -> Leaf
     root = empty_tree.add_node(node_type=1, parent=None, url="r", data={"tag": "found_me"})
@@ -262,15 +268,15 @@ def test_find_val_ancestor(empty_tree):
     leaf = empty_tree.add_node(node_type=1, parent=middle, url="l")
 
     # Search from leaf upwards for "tag"
-    found = empty_tree.find_val_ancestor(leaf, "tag")
-    assert found == root
+    found = empty_tree.find_val_in_ancestor(leaf, {"tag": None})
+    assert found == {"tag": "found_me"}
 
     # Search from leaf for specific value
-    found_specific = empty_tree.find_val_ancestor(leaf, "tag", "found_me")
-    assert found_specific == root
+    found_specific = empty_tree.find_val_in_ancestor(leaf, {"tag": "found_me"})
+    assert found_specific == {"tag": "found_me"}
 
     # Search for non-existent
-    found_none = empty_tree.find_val_ancestor(leaf, "non_existent_attr")
+    found_none = empty_tree.find_val_in_ancestor(leaf, {"non_existent_attr": None})
     assert found_none is None
 
 # ==========================================

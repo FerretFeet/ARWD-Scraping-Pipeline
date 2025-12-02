@@ -14,7 +14,7 @@ from src.structures.registries import PipelineRegistries, PipelineRegistryKeys, 
 class BillVoteSelector(SelectorTemplate):
     """Selector for Arkleg Bill Vote Page."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         """Initialize the selector template."""
         super().__init__(
             selectors={

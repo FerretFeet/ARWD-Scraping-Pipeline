@@ -6,7 +6,7 @@ from queue import LifoQueue, Queue
 from src.config.settings import known_links_cache_file, state_cache_file
 from src.data_pipeline.extract.webcrawler import Crawler
 from src.structures.indexed_tree import IndexedTree, PipelineStateEnum
-from src.structures.registries import PipelineRegistryKeys
+from src.structures.registries import PipelineRegistryKeys, ProcessorRegistry
 from src.utils.json_list import append_to_json_list, load_json_list
 from src.workers.pipeline_workers import CrawlerWorker, LoaderWorker, ProcessorWorker
 
@@ -16,6 +16,8 @@ STRICT = False
 def main() -> None:
     """Run the main function."""
     # ----- Set up vars
+
+    registry = ProcessorRegistry()  # Initialize the registry
 
     known_seed_links = load_json_list(known_links_cache_file)
     starting_seeds = []  # IMPORT
