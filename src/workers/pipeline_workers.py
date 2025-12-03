@@ -1,6 +1,5 @@
 """Thread workers for pipeline tasks."""
 
-import threading
 from dataclasses import dataclass
 from queue import Empty, LifoQueue, Queue
 from urllib.parse import urlparse
@@ -114,11 +113,6 @@ class CrawlerWorker(BaseWorker):
 
 
 
-    def _set_state(self, node: indexed_tree.Node, state: PipelineStateEnum) -> None:
-        print(f"_set_state: node id: {node.id}, state: {state}")
-        with node.lock:
-            node.state = state
-
 class ProcessorWorker(BaseWorker):
     """Thread to consume the processor queue and handle internal data processing."""
 
@@ -220,13 +214,9 @@ class ProcessorWorker(BaseWorker):
         print(f"template: {template}")
         return self.parser.get_content(template, html)
 
-    def _set_state(self, node: indexed_tree.Node, state: PipelineStateEnum) -> None:
-        print(f"_set_state: node id: {node.id}, state: {state}")
-        with node.lock:
-            node.state = state
 
 
-class LoaderWorker(threading.Thread):
+class LoaderWorker(BaseWorker):
     """Thread to consume the loader queue and handle database insertion."""
 
     def __init__(
@@ -239,13 +229,43 @@ class LoaderWorker(threading.Thread):
         strict: bool = False,
     ) -> None:
         """Initialize the loader worker."""
-        super().__init__()
-        self.input_queue = input_queue
+        super().__init__(input_queue)
         self.state = state_tree
-        self.running = True
         self.db_conn = db_conn
         self.fun_registry = fun_registry
         self.strict= strict
+
+    def process(self, item: LoaderObj):
+        node = item.node
+        self._set_state(node, PipelineStateEnum.LOADING)
+        try:
+            result: dict = self._load_item(item)
+            if result:
+                node.data = result
+            else:
+                node.data = None
+            self._set_state(node, PipelineStateEnum.COMPLETED)
+            self._remove_if_children_completed(node)
+        except Exception as e:
+            self.db_conn.rollback()
+            logger.warning(f"Uncaught exception in loader worker: {e}")
+            raise
+        finally:
+            self.db_conn.commit()
+
+    def _remove_if_children_completed(self, node: indexed_tree.Node):
+        keep_node = any(
+            self.state.find_node(child_id).state != PipelineStateEnum.COMPLETED
+            for child_id in node.children
+        )
+        if not keep_node:
+            self.state.safe_remove_node(node.id, cascade_up=True)
+
+    def _load_item(self, item: LoaderObj) -> dict:
+        page_enum = item.name
+        loader_fun = self.fun_registry.get_processor(page_enum, PipelineRegistries.LOAD)
+
+        return loader_fun(item.params, self.db_conn)
 
     def run(self) -> None:
         """Run the loader worker."""

@@ -1,6 +1,7 @@
 import threading
 from queue import Queue
 
+from src.structures import indexed_tree
 from src.structures.indexed_tree import PipelineStateEnum
 from src.utils.logger import logger
 
@@ -38,7 +39,13 @@ class BaseWorker(threading.Thread):
 
     def handle_error(self, item, error):
         # optional logging or state update
-        item.state = PipelineStateEnum.ERROR
+        self._set_state(item, PipelineStateEnum.ERROR)
         print(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {error}")
         print(f"Item state updated: {item.state}")
         logger.error(f"Uncaught processing error: {error}")
+
+
+    def _set_state(self, node: indexed_tree.Node, state: PipelineStateEnum) -> None:
+        print(f"_set_state: node id: {node.id}, state: {state}")
+        with node.lock:
+            node.state = state

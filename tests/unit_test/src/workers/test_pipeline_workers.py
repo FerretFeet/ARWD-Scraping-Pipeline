@@ -8,8 +8,37 @@ from src.structures.indexed_tree import PipelineStateEnum
 from src.workers.pipeline_workers import (
     CrawlerWorker,
     LoaderObj,
+    LoaderWorker,
     ProcessorWorker,
 )
+
+
+@pytest.fixture
+def fake_db_conn():
+    db_conn = MagicMock()
+    db_conn.commit.return_value = None
+    db_conn.rollback.return_value = None
+    return db_conn
+
+
+@pytest.fixture
+def fake_loader_obj(fake_node):
+    loader_obj = MagicMock(spec=LoaderObj)
+    loader_obj.node = fake_node
+    loader_obj.name = "PAGE_ENUM"
+    loader_obj.params = {"data": "value"}
+    return loader_obj
+
+
+@pytest.fixture
+def fake_fun_registry():
+    registry = MagicMock()
+    loader_fun = MagicMock()
+    loader_fun.return_value = {"db_result": "ok"}
+    registry.get_processor.return_value = loader_fun
+    return registry
+
+
 
 
 @pytest.fixture
@@ -288,6 +317,85 @@ class TestProcessorWorker:
         assert selector == {"a": "sel", "b": "sel2"}
         assert transformer == {"a": "tr", "b": "tr2"}
         assert state_pair[0] is not None
+
+
+@pytest.fixture
+def loader_worker(fake_tree, fake_db_conn, fake_fun_registry):
+    q = Queue()
+    worker = LoaderWorker(
+        input_queue=q,
+        state_tree=fake_tree,
+        db_conn=fake_db_conn,
+        fun_registry=fake_fun_registry,
+        strict=False,
+    )
+    return worker
+
+
+class TestLoaderWorker:
+
+    def test_process_success(self, loader_worker, fake_loader_obj, fake_db_conn, fake_tree):
+        loader_worker.process(fake_loader_obj)
+
+        # Node state should be updated
+        assert fake_loader_obj.node.state == PipelineStateEnum.COMPLETED
+
+        # Node data should reflect loader function output
+        assert fake_loader_obj.node.data == {"db_result": "ok"}
+
+        # Database commit called
+        fake_db_conn.commit.assert_called_once()
+        fake_db_conn.rollback.assert_not_called()
+
+        # Node removal logic
+        fake_tree.safe_remove_node.assert_called_with(fake_loader_obj.node.id, cascade_up=True)
+
+    def test_process_load_returns_none(self, loader_worker, fake_loader_obj, fake_db_conn):
+        # Simulate loader returning None
+        loader_worker.fun_registry.get_processor.return_value = lambda params, db: None
+
+        loader_worker.process(fake_loader_obj)
+
+        assert fake_loader_obj.node.data is None
+        assert fake_loader_obj.node.state == PipelineStateEnum.COMPLETED
+        fake_db_conn.commit.assert_called_once()
+
+    def test_process_raises_exception(self, loader_worker, fake_loader_obj, fake_db_conn):
+        # Simulate loader function raising exception
+        def raise_error(params, db):
+            raise Exception("DB error")
+        loader_worker.fun_registry.get_processor.return_value = raise_error
+
+        with pytest.raises(Exception) as excinfo:
+            loader_worker.process(fake_loader_obj)
+
+        assert "DB error" in str(excinfo.value)
+        fake_db_conn.rollback.assert_called_once()
+        fake_db_conn.commit.assert_called_once()  # finally always commits
+
+    def test_remove_if_children_not_completed(self, loader_worker, fake_loader_obj, fake_tree):
+        # Add a child node that is not completed
+        child_node = MagicMock()
+        child_node.state = PipelineStateEnum.PROCESSING
+        fake_loader_obj.node.children.append("child_id")
+        fake_tree.find_node.return_value = child_node
+
+        loader_worker._remove_if_children_completed(fake_loader_obj.node)
+
+        # safe_remove_node should NOT be called
+        fake_tree.safe_remove_node.assert_not_called()
+
+    def test_remove_if_children_completed(self, loader_worker, fake_loader_obj, fake_tree):
+        # Add a child node that is completed
+        child_node = MagicMock()
+        child_node.state = PipelineStateEnum.COMPLETED
+        fake_loader_obj.node.children.append("child_id")
+        fake_tree.find_node.return_value = child_node
+
+        loader_worker._remove_if_children_completed(fake_loader_obj.node)
+
+        # Node should be removed since all children are completed
+        fake_tree.safe_remove_node.assert_called_with(fake_loader_obj.node.id, cascade_up=True)
 
 # @pytest.fixture
 # def fake_db_conn():
