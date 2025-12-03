@@ -1,4 +1,4 @@
-from queue import LifoQueue
+from queue import LifoQueue, Queue
 from unittest.mock import MagicMock
 from urllib.parse import urlparse
 
@@ -7,6 +7,8 @@ import pytest
 from src.structures.indexed_tree import PipelineStateEnum
 from src.workers.pipeline_workers import (
     CrawlerWorker,
+    LoaderObj,
+    ProcessorWorker,
 )
 
 
@@ -17,7 +19,8 @@ def fake_node():
             self.id = "1"
             self.url = "https://arkleg.state.ar.us/page"
             self.state = None
-            self.data = {}
+            self.data = {"html": "<html></html>"}
+            self.type = "TEST"
             self.children = []
             self.lock = MagicMock()
 
@@ -32,12 +35,12 @@ def fake_tree(fake_node):
     return tree
 
 @pytest.fixture
-def queues():
+def lifoqueues():
     return LifoQueue(), LifoQueue()
 
 @pytest.fixture
-def worker(fake_tree, queues):
-    fetch_q, process_q = queues
+def worker(fake_tree, lifoqueues):
+    fetch_q, process_q = lifoqueues
     crawler = MagicMock()
     parser = MagicMock()
     registry = MagicMock()
@@ -51,24 +54,6 @@ def worker(fake_tree, queues):
         fun_registry=registry,
         strict=False,
     )
-
-@pytest.fixture
-def worker_thread(fake_tree, queues):
-    fetch_q, process_q = queues
-    crawler = MagicMock()
-    parser = MagicMock()
-    registry = MagicMock()
-
-    worker = CrawlerWorker(
-        fetch_queue=fetch_q,
-        process_queue=process_q,
-        state_tree=fake_tree,
-        crawler=crawler,
-        parser=parser,
-        fun_registry=registry,
-        strict=False,
-    )
-    return worker
 
 
 class TestCrawlerWorker:
@@ -96,8 +81,8 @@ class TestCrawlerWorker:
 
         assert result == {"links": ["a", "b"]}
 
-    def test_enqueue_links(self, worker, fake_tree, fake_node, queues):
-        fetch_q, _ = queues
+    def test_enqueue_links(self, worker, fake_tree, fake_node, lifoqueues):
+        fetch_q, _ = lifoqueues
 
         fake_tree.add_node.return_value = MagicMock(id="child")
 
@@ -111,8 +96,8 @@ class TestCrawlerWorker:
         # Two children queued
         assert fetch_q.qsize() == 2
 
-    def test_process_success(self, worker, fake_node, fake_tree, queues):
-        fetch_q, process_q = queues
+    def test_process_success(self, worker, fake_node, fake_tree, lifoqueues):
+        fetch_q, process_q = lifoqueues
 
         # Simulated worker behavior
         worker.crawler.get_page.return_value = "<html>"
@@ -149,19 +134,19 @@ class TestCrawlerWorker:
         # Should NOT be queued for processing
         assert fake_node.state == PipelineStateEnum.COMPLETED
 
-    def test_error_in_fetch_html(self, worker_thread, fake_node, queues):
-        fetch_q, process_q = queues
+    def test_error_in_fetch_html(self, worker, fake_node, lifoqueues):
+        fetch_q, process_q = lifoqueues
 
         # Cause _fetch_html to raise
-        worker_thread.crawler.get_page.side_effect = Exception("fetch failed")
+        worker.crawler.get_page.side_effect = Exception("fetch failed")
 
         # Queue the node and start the thread
         # LIFO Queue
         fetch_q.put(None)  # signal end
         fetch_q.put(fake_node)
 
-        worker_thread.start()
-        worker_thread.join()
+        worker.start()
+        worker.join()
 
         # BaseWorker should mark node as ERROR
         assert fake_node.state == PipelineStateEnum.ERROR
@@ -169,52 +154,140 @@ class TestCrawlerWorker:
         # Should not go to processor queue
         assert process_q.qsize() == 0
 
-    def test_error_in_parse_html(self, worker_thread, fake_node, queues):
-        fetch_q, process_q = queues
+    def test_error_in_parse_html(self, worker, fake_node, lifoqueues):
+        fetch_q, process_q = lifoqueues
 
-        worker_thread.crawler.get_page.return_value = "<html>"
-        worker_thread.parser.get_content.side_effect = Exception("parse failed")
+        worker.crawler.get_page.return_value = "<html>"
+        worker.parser.get_content.side_effect = Exception("parse failed")
 
         fetch_q.put(None)
         fetch_q.put(fake_node)
 
-        worker_thread.start()
-        worker_thread.join()
+        worker.start()
+        worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
         assert process_q.qsize() == 0
 
-    def test_error_in_enqueue_links(self, worker_thread, fake_node, queues):
-        fetch_q, process_q = queues
+    def test_error_in_enqueue_links(self, worker, fake_node, lifoqueues):
+        fetch_q, process_q = lifoqueues
 
-        worker_thread.crawler.get_page.return_value = "<html>"
-        worker_thread.parser.get_content.return_value = {"links": ["A"]}
+        worker.crawler.get_page.return_value = "<html>"
+        worker.parser.get_content.return_value = {"links": ["A"]}
 
         # Force tree.add_node to explode
-        worker_thread.state.add_node.side_effect = Exception("tree failed")
+        worker.state.add_node.side_effect = Exception("tree failed")
 
         fetch_q.put(None)
         fetch_q.put(fake_node)
 
-        worker_thread.start()
-        worker_thread.join()
+        worker.start()
+        worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
         assert process_q.qsize() == 0
 
-    def test_task_done_after_error(self, worker_thread, fake_node, queues):
-        fetch_q, _ = queues
+    def test_task_done_after_error(self, worker, fake_node, lifoqueues):
+        fetch_q, _ = lifoqueues
 
-        worker_thread.crawler.get_page.side_effect = Exception("boom")
+        worker.crawler.get_page.side_effect = Exception("boom")
         fetch_q.put(None)
         fetch_q.put(fake_node)
 
-        worker_thread.start()
-        worker_thread.join()
+        worker.start()
+        worker.join()
 
         # If task_done wasn't called, this will raise ValueError
         fetch_q.join()
 
+@pytest.fixture
+def processor_worker(fake_tree):
+    input_q = LifoQueue()
+    output_q = Queue()
+    parser = MagicMock()
+    transformer = MagicMock()
+    registry = MagicMock()
+
+    return ProcessorWorker(
+        input_queue=input_q,
+        output_queue=output_q,
+        state_tree=fake_tree,
+        parser=parser,
+        transformer=transformer,
+        fun_registry=registry,
+        strict=False,
+    )
+
+
+class TestProcessorWorker:
+
+    def test_parse_and_transform(self, processor_worker, fake_node):
+        processor_worker.parser.get_content.return_value = {"parsed_key": "parsed_value"}
+        processor_worker.transformer.transform_content.return_value = {"transformed_key": "transformed_value"}
+        processor_worker.fun_registry.get_processor.return_value = {
+            "state_key": (lambda n, s: {"state_val": 123}, lambda x: "fn"),
+            "title": ("sel", "tr"),
+        }
+
+        processor_worker.process(fake_node)
+
+        assert fake_node.state == PipelineStateEnum.AWAITING_LOAD
+
+        assert isinstance(fake_node.data, LoaderObj)
+        loader_obj = fake_node.data
+        assert loader_obj.params["transformed_key"] == "transformed_value"
+
+        assert processor_worker.output_queue.get_nowait() == loader_obj
+
+    def test_process_raises_on_invalid_loader(self, processor_worker, fake_node):
+        processor_worker.parser.get_content.return_value = {"parsed_key": "parsed_value"}
+        processor_worker.transformer.transform_content.return_value = None  # invalid transformed data
+        processor_worker.fun_registry.get_processor.return_value = {
+            "state_key": (lambda n, s: {"state_val": 123}, lambda x: "fn"),
+        }
+
+        with pytest.raises(Exception) as excinfo:
+            processor_worker.process(fake_node)
+
+        assert "loader obj not able to be created" in str(excinfo.value)
+
+    def test_error_in_parse_html(self, processor_worker, fake_node):
+        processor_worker.parser.get_content.side_effect = Exception("parse failed")
+        processor_worker.fun_registry.get_processor.return_value = {
+            "state_key": (lambda n, s: {"state_val": 123}, lambda x: "fn"),
+        }
+
+        try:
+            processor_worker.process(fake_node)
+        except Exception:
+            processor_worker.handle_error(fake_node, Exception("parse failed"))
+
+        assert fake_node.state == PipelineStateEnum.ERROR
+
+    def test_error_in_transform_data(self, processor_worker, fake_node):
+        processor_worker.parser.get_content.return_value = {"parsed_key": "parsed_value"}
+        processor_worker.transformer.transform_content.side_effect = Exception("transform failed")
+        processor_worker.fun_registry.get_processor.return_value = {
+            "state_key": (lambda n, s: {"state_val": 123}, lambda x: "fn"),
+        }
+
+        try:
+            processor_worker.process(fake_node)
+        except Exception:
+            processor_worker.handle_error(fake_node, Exception("transform failed"))
+
+        assert fake_node.state == PipelineStateEnum.ERROR
+
+    def test_get_processing_templates(self, processor_worker):
+        processor_worker.fun_registry.get_processor.return_value = {
+            "state_key": (lambda n, s: {}, lambda x: None),
+            "a": ("sel", "tr"),
+            "b": ("sel2", "tr2"),
+        }
+        selector, transformer, state_pair = processor_worker._get_processing_templates("https://arkleg.state.ar.us/page")
+        assert selector == {"a": "sel", "b": "sel2"}
+        assert transformer == {"a": "tr", "b": "tr2"}
+        assert state_pair[0] is not None
 
 # @pytest.fixture
 # def fake_db_conn():

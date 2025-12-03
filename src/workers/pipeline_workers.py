@@ -1,7 +1,6 @@
 """Thread workers for pipeline tasks."""
 
 import threading
-import time
 from dataclasses import dataclass
 from queue import Empty, LifoQueue, Queue
 from urllib.parse import urlparse
@@ -72,11 +71,6 @@ class CrawlerWorker(BaseWorker):
             print("No next step, finished.")
 
 
-
-
-
-
-
     def _check_processing_step(self, url: str) -> bool:
         print(f"_check_processing_step: url {url}")
         parsed_url = get_url_base_path(url)
@@ -125,94 +119,7 @@ class CrawlerWorker(BaseWorker):
         with node.lock:
             node.state = state
 
-
-    # def run(self) -> None:
-    #     """Run the crawler worker."""
-    #     while self.running:
-    #         node = None
-    #         try:
-    #             # 1. Get Node (Blocks for 1 second)
-    #             node = self.fetch_queue.get(timeout=1)
-    #             logger.info(f"[CRAWLER] Fetched node {node.id} with URL: {node.url}")
-    #             if node is None:
-    #                 self.fetch_queue.task_done()
-    #                 return
-    #             # 2. Process Node
-    #             try:
-    #                 with node.lock:
-    #                     node.state = PipelineStateEnum.FETCHING
-    #
-    #                     # --- Processing Logic ---
-    #
-    #                     url = node.url
-    #                     if url:
-    #                         # Assuming URL format allows splitting by first "/"
-    #                         parsed_url = urlparse(url)
-    #                         url_stem = parsed_url.path
-    #
-    #                         html_text = self.crawler.get_page(url_stem)
-    #                         node.data["html"] = html_text
-    #                         # 2.1 Parse HTML for next links
-    #                         parser_url = url.split("?", 1)[0]
-    #                         html_parser = HTMLParser(strict=self.strict)
-    #                         parser_enum = get_enum_by_url(parser_url)
-    #                         parsing_template = self.fun_registry.get_processor(
-    #                             parser_enum, PipelineRegistries.FETCH,
-    #                         )
-    #                         new_links = html_parser.get_content(parsing_template, html_text)
-    #
-    #                         # 2.2 Queue New Links
-    #                         for key, item in new_links.items():
-    #                             if not item:
-    #                                 continue
-    #                             if not isinstance(item, list):
-    #                                 item = [item]
-    #                             for it in item:
-    #                                 url_type = it.split("?", 1)[0]
-    #                                 url_enum = get_enum_by_url(url_type)
-    #                                 new_node = self.state.add_node(
-    #                                     parent=node.id,
-    #                                     url=it,
-    #                                     state=PipelineStateEnum.AWAITING_FETCH,
-    #                                     node_type=url_enum,
-    #                                 )
-    #                                 self.fetch_queue.put(new_node)
-    #                                 logger.info(f"[CRAWLER] Added new node "
-    #                                             f"{new_node.id} to fetch queue")
-    #
-    #                         # 2.3 Finish processing the current node
-    #                         node.state = PipelineStateEnum.AWAITING_PROCESSING
-    #                         self.process_queue.put(node)
-    #
-    #             # 3. Handle processing exceptions
-    #             except Exception as processing_error:
-    #                 # Set the state to ERROR if the node was successfully retrieved
-    #                 if node:
-    #                     node.state = PipelineStateEnum.ERROR
-    #                     logger.warning(f"[CRAWLER ERROR] Node ID {node.id}: {processing_error}")
-    #                 # Re-raise the error to be caught by the outer block for logging/flow control
-    #                 raise processing_error
-    #
-    #             # 4. Final Cleanup (Always called if node was retrieved)
-    #             finally:
-    #                 # 🟢 CRITICAL: Ensure task_done is called exactly once here.
-    #                 self.fetch_queue.task_done()
-    #                 logger.info(f"[CRAWLER] Node {node.id} task done.")
-    #
-    #             # Optional: Sleep outside the lock for throttling
-    #             time.sleep(0.2)
-    #
-    #         except Empty:
-    #             # Queue timed out (empty)
-    #             time.sleep(0.2)
-    #             continue  # Go back to the top of the while loop
-    #
-    #         except Exception as e:
-    #             # Handles exceptions from queue.get() or re-raised exceptions from processing
-    #             if not node:
-    #                 logger.error(f"[CRAWLER FATAL] Error during queue get: {e}")
-
-class ProcessorWorker(threading.Thread):
+class ProcessorWorker(BaseWorker):
     """Thread to consume the processor queue and handle internal data processing."""
 
     def __init__(
@@ -220,113 +127,104 @@ class ProcessorWorker(threading.Thread):
         input_queue: LifoQueue,
         output_queue: Queue,
         state_tree: IndexedTree,
+        parser: HTMLParser,
+        transformer: PipelineTransformer,
         fun_registry: ProcessorRegistry,
         *,
         strict: bool,
     ) -> None:
         """Initialize the processor worker."""
-        super().__init__()
-        self.input_queue = input_queue
+        super().__init__(input_queue)
         self.output_queue = output_queue
         self.state = state_tree
-        self.running = True
+        self.parser = parser
+        self.transformer = transformer
         self.strict = strict
         self.fun_registry = fun_registry
 
-    def run(self) -> None:
-        """Run the processor worker."""
-        while self.running:
-            node = None  # Initialize node here for outer scope access
-            try:
-                node = self.input_queue.get(timeout=1)
-                if node is None:
-                    self.input_queue.task_done()
-                    return
-                logger.info(
-                    f"[PROCESSOR] Fetched node {node.id} for processing with URL: {node.url}",
-                )
 
-                # 🚨 FIX: Ensure task_done is called, even on exception
-                try:
-                    with node.lock:
-                        node.state = PipelineStateEnum.PROCESSING
-                        url = node.url
-                        parser_url = url.split("?", 1)[0]
-                        # ... (rest of parsing/transformer logic) ...
+    def process(self, node: indexed_tree.Node) -> None:
+        self._set_state(node, PipelineStateEnum.PROCESSING)
+        t_parser, t_transformer, state_pair = self._get_processing_templates(node.url)
+        parsed_data = self._parse_html(node.url, node.data["html"])
+        # --- Attach state values after parse, parser not able to handle
+        parsed_data, t_transformer = self._attach_state_values(node, parsed_data, t_transformer, state_pair)
+        transformed_data = self._transform_data(parsed_data, t_transformer)
+        loader_obj = self._create_loader_object(transformed_data, node)
+        if loader_obj:
+            print(f"LOADER OBJ {loader_obj}")
+            node.data = loader_obj
+            self._set_state(node, PipelineStateEnum.AWAITING_LOAD)
+            self.output_queue.put(loader_obj)
+        else:
+            msg = f"loader obj not able to be created for {node}"
+            logger.error(msg)
+            raise Exception(msg)  # noqa: TRY002
 
-                        html_parser = HTMLParser(strict=self.strict)
+    def _create_loader_object(self, transformed_data: dict, node: indexed_tree.Node):
+        if not transformed_data: return None
+        if isinstance(transformed_data, list):
+            transformed_data = transformed_data[0]
+        if isinstance(transformed_data, dict):
+            loader_obj = LoaderObj(
+                node=node,
+                name=node.type,
+                params=dict(transformed_data.items()),
+            )
+        else:
+            loader_obj = LoaderObj(
+                node=node,
+                name=node.type,
+                params={"item": transformed_data},
+            )
+        return loader_obj
 
-                        parser_enum = get_enum_by_url(parser_url)
-                        original_templates: dict = self.fun_registry.get_processor(
-                            parser_enum, PipelineRegistries.PROCESS,
-                        )
-                        parsing_templates = original_templates.copy()
+    def _transform_data(self, parsed_data: dict, transformer_template: dict) -> dict:
+        return self.transformer.transform_content(
+            transformer_template,
+            parsed_data,
+        )
 
-                        state_key_pair = parsing_templates.pop("state_key", (None,None))
-                        get_state_fun = state_key_pair[0]
-                        state_transform_fun = state_key_pair[1]
-                        # Separate selectors and transformers from parsing templates
-                        selector_template = {
-                            key: val[0]
-                            for key, val in parsing_templates.items()
-                        }
-                        transformer_template = {
-                            key: val[1] for key, val in parsing_templates.items()
-                        }
+    def _attach_state_values(
+        self, node: indexed_tree.Node, parsed_data: dict, t_transformer: dict, state_pair: tuple,
+    ) -> tuple:
+        state_dict = state_pair[0](node, self.state)
+        parsed_data.update(state_dict)
+        t_transformer.update(dict.fromkeys(state_dict, state_pair[1]))
+        return parsed_data, t_transformer
 
-                        state_dict = {} if not get_state_fun else get_state_fun(node, self.state)
-                        state_transform_dict = {}
-                        for key in state_dict.keys():
-                            state_transform_dict.update({key: state_transform_fun})
-                        parsed_data = html_parser.get_content(selector_template, node.data["html"])
-                        parsed_data.update(state_dict)
-                        transformer_template.update(state_transform_dict)
-                        transformer = PipelineTransformer(strict=self.strict)
-                        transformed_data = transformer.transform_content(
-                            transformer_template, parsed_data,
-                        )
-                        if isinstance(transformed_data, list):
-                            transformed_data = transformed_data[0]
-                        if isinstance(transformed_data, dict):
-                            loader_obj = LoaderObj(
-                                node=node, name=node.type, params=dict(transformed_data.items()),
-                            )
-                        else:
-                            loader_obj = LoaderObj(
-                                node=node, name=node.type, params={"item": transformed_data},
-                            )
-                        node.state = PipelineStateEnum.AWAITING_LOAD
-                        self.output_queue.put(loader_obj)
-                        logger.info(
-                            f"[PROCESSOR] Node {node.id} state set to AWAITING_LOAD,"
-                            f"LoaderObj put in output queue",
-                        )
-                        print("done")
+    def _get_processing_templates(self, url: str):
+        parsed_url = get_url_base_path(url)
+        parser_enum = get_enum_by_url(parsed_url)
+        __original_templates = self.fun_registry.get_processor(
+            parser_enum,
+            PipelineRegistries.PROCESS,
+        )
+        parsing_templates = __original_templates.copy()
 
-                except Exception as inner_e:
-                    # 🚨 FIX: Revert state to FAILED/ERROR if processing fails
-                    if node and node.state == PipelineStateEnum.PROCESSING:
-                        # Assuming you have a FAILED or ERROR state enum
-                        node.state = PipelineStateEnum.ERROR
+        state_key_pair = parsing_templates.pop("state_key", (None, None))
 
-                        # Re-raise the exception to be logged by the outer block
-                    raise inner_e
+        # Separate selectors and transformers from parsing templates
+        selector_template = {key: val[0] for key, val in parsing_templates.items()}
+        transformer_template = {key: val[1] for key, val in parsing_templates.items()}
 
-                finally:
-                    logger.info(f"[PROCESSOR] Node {node.id} task done")
-                    self.input_queue.task_done()
 
-            except Empty:
-                # Only sleep and continue if the queue was empty (timeout hit)
-                time.sleep(0.2)
-                continue
+        return selector_template, transformer_template, state_key_pair
 
-            except Exception as e:
-                # This handles exceptions raised by the inner block (re-raised)
-                if node:
-                    logger.warning(f"[PROCESSOR ERROR] Node ID {node.id}: {e}")
-                else:
-                    logger.warning(f"[PROCESSOR ERROR] Could not fetch node: {e}")
+
+    def _parse_html(self, url: str, html: str) -> dict:
+        print(f"_parse_html: {url}, {html[:20]}")
+        parsed_url = get_url_base_path(url)
+        parser_enum = get_enum_by_url(parsed_url)
+        template = self.fun_registry.get_processor(parser_enum, PipelineRegistries.FETCH)
+        print(f"template: {template}")
+        return self.parser.get_content(template, html)
+
+    def _set_state(self, node: indexed_tree.Node, state: PipelineStateEnum) -> None:
+        print(f"_set_state: node id: {node.id}, state: {state}")
+        with node.lock:
+            node.state = state
+
 
 class LoaderWorker(threading.Thread):
     """Thread to consume the loader queue and handle database insertion."""
