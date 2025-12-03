@@ -1,24 +1,37 @@
 from collections.abc import Callable
 from enum import Enum, auto
 from typing import Any
+from urllib.parse import urlparse
 
 
 class PipelineRegistryKeys(Enum):
     """Enum defining pipeline registry keys, valid pages."""
 
-    ARK_LEG_SEEDER = "https://arkleg.state.ar.us/"
-    LEGISLATOR_LIST = "https://arkleg.state.ar.us/Legislators/List"
-    LEGISLATOR = "https://arkleg.state.ar.us/Legislators/Detail"
-    BILLS_SECTION = "https://arkleg.state.ar.us/Bills"
-    BILL_CATEGORIES = "https://arkleg.state.ar.us/Bills/SearchByRange"
-    BILL_LIST = "https://arkleg.state.ar.us/Bills/ViewBills"
-    BILL = "https://arkleg.state.ar.us/Bills/Detail"
-    BILL_VOTE = "https://arkleg.state.ar.us/Bills/Votes"
+    ARK_LEG_SEEDER = "arkleg.state.ar.us/"
+    LEGISLATOR_LIST = "arkleg.state.ar.us/Legislators/List"
+    LEGISLATOR = "arkleg.state.ar.us/Legislators/Detail"
+    BILLS_SECTION = "arkleg.state.ar.us/Bills"
+    BILL_CATEGORIES = "arkleg.state.ar.us/Bills/SearchByRange"
+    BILL_LIST = "arkleg.state.ar.us/Bills/ViewBills"
+    BILL = "arkleg.state.ar.us/Bills/Detail"
+    BILL_VOTE = "arkleg.state.ar.us/Bills/Votes"
 
 def get_enum_by_url(url: str) -> PipelineRegistryKeys:
-    # Iterate over the enum members and return the matching one
-    for key in PipelineRegistryKeys:
-        if key.value == url:
+    parsed_url = urlparse(url)
+    cleaned_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+
+    cleaned_url = cleaned_url.rstrip("/")
+
+    # Sort the keys by length (longest value first) to ensure specific pages
+    # (like 'Bills/Detail') match before generic ones (like 'Bills').
+    sorted_keys = sorted(PipelineRegistryKeys, key=lambda k: len(k.value), reverse=True)
+
+    for key in sorted_keys:
+        # Check if the enum's value is contained within the cleaned input URL.
+        # Example: 'https://arkleg.state.ar.us/Bills/Detail' is in 'https://arkleg.state.ar.us/Bills/Detail'
+        # Example: 'https://arkleg.state.ar.us/Bills' is in 'https://arkleg.state.ar.us/Bills/ViewBills'
+        # The key sorting prevents the second example from misclassifying.
+        if key.value in cleaned_url:
             return key
     raise ValueError(f"URL '{url}' not found in PipelineRegistryKeys enum.")
 

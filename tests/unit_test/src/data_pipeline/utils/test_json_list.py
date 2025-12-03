@@ -16,12 +16,12 @@ def test_append_and_load():
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp_path = Path(tmp.name)
     try:
-        append_to_json_list(tmp_path, {"name": "Alice"})
-        append_to_json_list(tmp_path, {"name": "Bob"})
+        append_to_json_list(tmp_path, "Alice")
+        append_to_json_list(tmp_path, "Bob")
         data = load_json_list(tmp_path)
         assert len(data) == 2  # noqa: PLR2004
-        assert data[0]["name"] == "Alice"
-        assert data[1]["name"] == "Bob"
+        assert data[0] == "Alice"
+        assert data[1] == "Bob"
     finally:
         Path.unlink(tmp_path)
 

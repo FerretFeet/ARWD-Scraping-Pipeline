@@ -104,18 +104,8 @@ LEGISLATOR_FIXTURE_PARAMS = [
 ]
 LEGISLATOR_LIST_PARAMS = [
     (
-        "bill_page/bill",
-        "https://www.arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2025%2F2025R",
+        "legislator/list",
+        "https://arkleg.state.ar.us/Legislators/List",
         "v1",
-    ),
-    (
-        "bill_page/bill",
-        "https://www.arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2017%2F2017R",
-        "v2",
-    ),
-    (
-        "bill_page/bill",
-        "https://www.arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2003%2FR",
-        "v3",
     ),
 ]

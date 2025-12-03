@@ -23,7 +23,7 @@ def load_json_list(file_path: str | Path) -> list:
     except json.JSONDecodeError:
         return []
 
-def append_to_json_list(file_path: str | Path, new_item: dict) -> None:
+def append_to_json_list(file_path: str | Path, new_item: str) -> None:
     """
     Append a dictionary to a JSON list file.
     

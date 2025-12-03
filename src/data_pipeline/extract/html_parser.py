@@ -71,7 +71,6 @@ class HTMLParser:
             raise TypeError(message)
         content_holder: dict = {}
         soup = BeautifulSoup(html_text, "html.parser")
-        logger.info("Html parser running")
 
         if soup:
             for key, val in template.items():
@@ -82,9 +81,11 @@ class HTMLParser:
                         if not isinstance(data, list) and data is not None:
                             data = [data]
                         content_holder[key] = data
-                    except (AttributeError, Exception) as e:  # noqa: BLE001
+                    except (AttributeError, Exception) as e:
                         logger.warning(f"Error running custom parser for '{key}': {e}")
                         content_holder[key] = None
+                        if self.strict:
+                            raise
 
                 else:
                     selector = attr = None

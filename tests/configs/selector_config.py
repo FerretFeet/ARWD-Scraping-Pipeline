@@ -5,39 +5,6 @@ Inputs:
 - fixture_params (located in ./html_fixture_params.py)
 - required_keys (list of required successful selector attributes)
 """
-
-from src.data_pipeline.extract.selector_templates.arkleg.bill_category_selector import (
-    BillCategorySelector,
-)
-from src.data_pipeline.extract.selector_templates.arkleg.bill_list_selector import (
-    BillListSelector,
-)
-from src.data_pipeline.extract.selector_templates.arkleg.bill_selector import (
-    BillSelector,
-)
-from src.data_pipeline.extract.selector_templates.arkleg.bill_vote_selector import (
-    BillVoteSelector,
-)
-from src.data_pipeline.extract.selector_templates.arkleg.legislator_list_selector import (
-    LegislatorListSelector,
-)
-from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
-    LegislatorSelector,
-)
-from src.data_pipeline.transform.templates.arkleg.bill_category_transformer import (
-    BillCategoryTransformer,
-)
-from src.data_pipeline.transform.templates.arkleg.bill_list_transformer import BillListTransformer
-from src.data_pipeline.transform.templates.arkleg.bill_transformer import BillTransformer
-from src.data_pipeline.transform.templates.arkleg.bill_vote_transformer import BillVoteTransformer
-from src.data_pipeline.transform.templates.arkleg.legislator_list_transformer import (
-    LegislatorListTransformer,
-)
-from src.data_pipeline.transform.templates.arkleg.legislator_transformer import (
-    LegislatorTransformer,
-)
-from src.data_pipeline.validate.models.arkleg.bill_category import BillCategoryValidator
-from src.data_pipeline.validate.models.arkleg.bill_list import BillListValidator
 from tests.configs.html_fixture_params import (
     BILL_CATEGORY_FIXTURE_PARAMS,
     BILL_FIXTURE_PARAMS,
@@ -49,33 +16,22 @@ from tests.configs.html_fixture_params import (
 
 SELECTOR_TESTS = [
     {
-        "selector_class": LegislatorSelector,
         "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
         "required_keys": ["title", "district", "seniority"],
-        "transformer_dict": LegislatorTransformer,
     },
     {
-        "selector_class": LegislatorListSelector,
         "fixture_params": LEGISLATOR_LIST_PARAMS,
         "required_keys": ["legislator_link"],
-        "transformer_dict": LegislatorListTransformer,
     },
     {
-        "selector_class": BillCategorySelector,
         "fixture_params": BILL_CATEGORY_FIXTURE_PARAMS,
         "required_keys": ["bill_cat_link"],
-        "transformer_dict": BillCategoryTransformer,
-        "validator_cls": BillCategoryValidator,
     },
     {
-        "selector_class": BillListSelector,
         "fixture_params": BILL_LIST_FIXTURE_PARAMS,
         "required_keys": ["chamber", "session", "bill_url"],
-        "transformer_dict": BillListTransformer,
-        "validator_cls": BillListValidator,
     },
     {
-        "selector_class": BillSelector,
         "fixture_params": BILL_FIXTURE_PARAMS,
         "required_keys": [
             "title",
@@ -85,13 +41,10 @@ SELECTOR_TESTS = [
             "lead_sponsor",
             "intro_date",
         ],
-        "transformer_dict": BillTransformer,
     },
     {
-        "selector_class": BillVoteSelector,
         "fixture_params": VOTE_PAGE_FIXTURE_PARAMS,
         "required_keys": ["title"],
-        "transformer_dict": BillVoteTransformer,
     },
     # Add other selectors here...
 ]

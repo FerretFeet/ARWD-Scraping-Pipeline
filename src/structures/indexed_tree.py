@@ -395,7 +395,8 @@ class IndexedTree:
         """Load tree from a file."""
         if not Path(filepath).exists():
             msg = f"{filepath} does not exist."
-            raise FileNotFoundError(msg)
+            # raise FileNotFoundError(msg)
+            return None
 
         with Path.open(filepath) as f:
             json_str = f.read()
@@ -411,4 +412,27 @@ class IndexedTree:
         return (
             f"IndexedTree(Nodes: {len(self.nodes)}, "
             f"Root: {self.root.id if self.root else 'None'})"
+        )
+
+    def reconstruct_order(self):
+        return (self.reverse_in_order_traversal(
+                self.root,
+                node_attrs={"state": PipelineStateEnum.AWAITING_FETCH},
+            )
+            + self.reverse_in_order_traversal(
+                self.root,
+                node_attrs={"state": PipelineStateEnum.CREATED},
+            )
+            + self.reverse_in_order_traversal(
+                self.root,
+                node_attrs={"state": PipelineStateEnum.FETCHING},
+            )
+            + self.reverse_in_order_traversal(
+                self.root,
+                node_attrs={"state": PipelineStateEnum.AWAITING_PROCESSING},
+            )
+            + self.reverse_in_order_traversal(
+                self.root,
+                node_attrs={"state": PipelineStateEnum.PROCESSING},
+            )
         )

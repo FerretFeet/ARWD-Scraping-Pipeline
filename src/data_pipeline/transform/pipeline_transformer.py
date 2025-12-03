@@ -33,9 +33,12 @@ class PipelineTransformer:
             dict: transformed content
 
         """
+        print("transform content func")
         transformed_content = {}
         failed_keys = []
         for key, value in content.items():
+            print(f"key {key}")
+            print(f"value {value}")
             if key not in template:
                 msg = f"Key {key} not in template"
                 logger.error(msg)
