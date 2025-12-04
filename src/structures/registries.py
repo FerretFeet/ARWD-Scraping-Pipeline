@@ -1,20 +1,10 @@
 from collections.abc import Callable
-from enum import Enum, auto
+from queue import Queue
 from typing import Any
 from urllib.parse import urlparse
 
+from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
 
-class PipelineRegistryKeys(Enum):
-    """Enum defining pipeline registry keys, valid pages."""
-
-    ARK_LEG_SEEDER = "arkleg.state.ar.us/"
-    LEGISLATOR_LIST = "arkleg.state.ar.us/Legislators/List"
-    LEGISLATOR = "arkleg.state.ar.us/Legislators/Detail"
-    BILLS_SECTION = "arkleg.state.ar.us/Bills"
-    BILL_CATEGORIES = "arkleg.state.ar.us/Bills/SearchByRange"
-    BILL_LIST = "arkleg.state.ar.us/Bills/ViewBills"
-    BILL = "arkleg.state.ar.us/Bills/Detail"
-    BILL_VOTE = "arkleg.state.ar.us/Bills/Votes"
 
 def get_enum_by_url(url: str) -> PipelineRegistryKeys:
     parsed_url = urlparse(url)
@@ -35,14 +25,9 @@ def get_enum_by_url(url: str) -> PipelineRegistryKeys:
             return key
     raise ValueError(f"URL '{url}' -> '{cleaned_url}' not found in PipelineRegistryKeys enum.")
 
-class PipelineRegistries(Enum):
-    """Enum defining pipeline registries. Pipeline steps."""
 
-    FETCH = auto()
-    PROCESS = auto()
-    LOAD = auto()
 # Type Alias
-type ProcessorType = type[Any] | Callable[..., Any]
+type ProcessorType = type[Any] | Callable[..., Any] | dict
 
 class ProcessorRegistry:
     """A centralized registry to manage pipeline processors."""
@@ -53,7 +38,7 @@ class ProcessorRegistry:
             key: {} for key in PipelineRegistryKeys
         }
 
-    def register(self, name: PipelineRegistryKeys, stage: PipelineRegistries):
+    def register(self, name: PipelineRegistryKeys, stage: PipelineRegistries, **attrs: dict):
         """
         Decorator method to register a function or class.
 
@@ -70,7 +55,10 @@ class ProcessorRegistry:
                 raise ValueError(msg)
 
             # 2. Registration
-            self._registry[name][stage] = cls_or_func
+            self._registry[name][stage] = {
+                "processor": cls_or_func,
+                "attrs": attrs,
+            }
             return cls_or_func
 
         return decorator
@@ -78,7 +66,7 @@ class ProcessorRegistry:
     def get_processor(self, name: PipelineRegistryKeys, stage: PipelineRegistries) -> ProcessorType:
         """Retrieve a processor. Raises error if not found."""
         try:
-            return self._registry[name][stage]
+            return self._registry[name][stage]["processor"]
         except KeyError as err:
             msg = f"No processor found for {name.name} at stage {stage.name}"
             raise ValueError(msg) from err
@@ -86,3 +74,23 @@ class ProcessorRegistry:
     def get_all(self) -> dict:
         """Read-only view of the registry (optional utility)."""
         return self._registry
+
+    def get_attrs(self, name: PipelineRegistryKeys, stage: PipelineRegistries) -> dict[str, Any]:
+        """Retrieve a registry's attributes. Raises error if not found."""
+        try:
+            return self._registry[name][stage]["attrs"]
+        except KeyError as err:
+            raise ValueError(f"No attributes found for {name.name} at stage {stage.name}") from err
+
+    def get_queue_type(self, stage: PipelineRegistries) -> type[Queue]:
+        """Return the queue type associated with this pipeline stage."""
+        return stage.queue_type
+
+    def load_config(self, config: dict):
+        """
+        Load a config mapping:
+            {PipelineRegistryKey: {Stage: Processor}}
+        """
+        for key, stage_map in config.items():
+            for stage, processor in stage_map.items():
+                self.register(key, stage)(processor)

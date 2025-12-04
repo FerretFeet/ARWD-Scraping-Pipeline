@@ -5,8 +5,6 @@ from bs4 import BeautifulSoup
 # Assuming these imports are already part of the code
 from src.models.selector_template import SelectorTemplate
 from src.structures.registries import (
-    PipelineRegistries,
-    PipelineRegistryKeys,
     ProcessorRegistry,  # Assuming you import this
 )
 
@@ -14,7 +12,6 @@ from src.structures.registries import (
 registry = ProcessorRegistry()
 
 
-@registry.register(PipelineRegistryKeys.ARK_LEG_SEEDER, PipelineRegistries.FETCH)
 class ArkLegSeederLinkSelector(SelectorTemplate):
     """Selector template for ArkLeg BillCategory Page."""
 
@@ -36,8 +33,7 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
         return None
 
 
-@registry.register(PipelineRegistryKeys.BILLS_SECTION, PipelineRegistries.FETCH)
-class ArkLegSeederLinkSelectorForBillSection(SelectorTemplate):
+class BillSectionLinkSelector(SelectorTemplate):
     """Selector template for ArkLeg BillCategory Page."""
 
     def __init__(self) -> None:
@@ -49,7 +45,6 @@ class ArkLegSeederLinkSelectorForBillSection(SelectorTemplate):
         )
 
 
-@registry.register(PipelineRegistryKeys.BILL_CATEGORIES, PipelineRegistries.FETCH)
 class BillCategoryLinkSelector(SelectorTemplate):
     """Selector template for ArkLeg BillCategory Page."""
 
@@ -62,7 +57,6 @@ class BillCategoryLinkSelector(SelectorTemplate):
         )
 
 
-@registry.register(PipelineRegistryKeys.BILL_LIST, PipelineRegistries.FETCH)
 class BillListLinkSelector(SelectorTemplate):
     """Selector for Arkleg BillList Page."""
 
@@ -76,7 +70,6 @@ class BillListLinkSelector(SelectorTemplate):
         )
 
 
-@registry.register(PipelineRegistryKeys.BILL, PipelineRegistries.FETCH)
 class BillLinkSelector(SelectorTemplate):
     """Selector for Arkleg bill page."""
 
@@ -94,7 +87,6 @@ class BillLinkSelector(SelectorTemplate):
         return soup.find_all("a", string=re.compile(r"vote", re.IGNORECASE))  # type: ignore  # noqa: PGH003
 
 
-@registry.register(PipelineRegistryKeys.LEGISLATOR_LIST, PipelineRegistries.FETCH)
 class LegislatorListLinkSelector(SelectorTemplate):
     """Selector for Arkleg Legislator List Page."""
 

@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import psycopg
 
+from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
 from src.data_pipeline.extract.html_parser import HTMLParser
 from src.data_pipeline.extract.webcrawler import Crawler
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
@@ -13,8 +14,6 @@ from src.data_pipeline.utils.fetch_scheduler import FetchScheduler
 from src.structures import indexed_tree
 from src.structures.indexed_tree import IndexedTree, PipelineStateEnum
 from src.structures.registries import (
-    PipelineRegistries,
-    PipelineRegistryKeys,
     ProcessorRegistry,
     get_enum_by_url,
 )

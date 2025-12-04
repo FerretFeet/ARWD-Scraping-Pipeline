@@ -5,16 +5,13 @@ import re
 
 from bs4 import BeautifulSoup
 
-from src.data_pipeline.extract.fetching_templates.arkleg_fetchers import registry
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.data_pipeline.transform.utils.transform_str_to_date import transform_str_to_date
 from src.models.selector_template import SelectorTemplate
-from src.structures.registries import PipelineRegistries, PipelineRegistryKeys
 
 
-@registry.register(PipelineRegistryKeys.BILL, PipelineRegistries.PROCESS)
 class BillSelector(SelectorTemplate):
     """Selector for Arkleg bill page."""
 

@@ -4,18 +4,15 @@ import re
 
 from bs4 import BeautifulSoup
 
-from src.data_pipeline.extract.fetching_templates.arkleg_fetchers import registry
 from src.data_pipeline.transform.utils.cast_to_int import cast_to_int
 from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.data_pipeline.transform.utils.transform_leg_title import transform_leg_title
 from src.data_pipeline.transform.utils.transform_phone import transform_phone
 from src.models.selector_template import SelectorTemplate
-from src.structures.registries import PipelineRegistries, PipelineRegistryKeys
 from src.utils.logger import logger
 
 
-@registry.register(PipelineRegistryKeys.LEGISLATOR, PipelineRegistries.PROCESS)
 class LegislatorSelector(SelectorTemplate):
     """Selector template for Arkleg legislator page."""
 

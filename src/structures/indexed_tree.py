@@ -12,7 +12,7 @@ from src.utils.custom_exceptions.indexed_tree_exceptions import TreeUpdateError
 from src.utils.logger import logger
 
 if TYPE_CHECKING:
-    from src.structures.registries import PipelineRegistryKeys
+    from src.config.pipeline_enums import PipelineRegistryKeys
 
 
 class PipelineStateEnum(IntEnum):
