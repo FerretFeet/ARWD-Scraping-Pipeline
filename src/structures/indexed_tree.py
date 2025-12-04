@@ -44,6 +44,7 @@ class Node:
         state: PipelineStateEnum = PipelineStateEnum.CREATED,
         override_id: int | None = None,
         url: str | None,
+        tree: IndexedTree | None = None,
     ) -> None:
         """Initialize Node."""
         # Allow ID override for loading from file
@@ -62,6 +63,7 @@ class Node:
         self.url = url
         self.type = node_type
         self.lock = threading.Lock()
+        self.tree = tree
 
         # Handle state input as Int (from JSON) or Enum
         if isinstance(state, int):
@@ -92,12 +94,13 @@ class Node:
 class IndexedTree:
     """Indexed tree structure to store parent child relationships and allow id lookups."""
 
-    def __init__(self, root: Node | None = None) -> None:
+    def __init__(self, root: Node | None = None, name: str | None = None) -> None:
         """Initialize IndexedTree."""
         self.nodes: dict[int, Node] = {}  # Removed | None, better to del key
         self.root: Node | None = None
         if root:
             self.set_root(root)
+        self.name = name
 
     def reset(self):
         self.nodes: dict[int, Node] = {}
@@ -126,6 +129,7 @@ class IndexedTree:
             state=state,
             url=url,
             node_type=node_type,
+            tree=self,
         )
 
         if parent is not None and parent.id in self.nodes:

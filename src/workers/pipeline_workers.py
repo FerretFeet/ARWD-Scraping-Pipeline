@@ -46,8 +46,8 @@ class CrawlerWorker(BaseWorker):
         self,
         fetch_queue: LifoQueue,
         process_queue: Queue,
-        state_tree: IndexedTree,
-        crawler: Crawler,
+        state_tree: dict[str, IndexedTree],
+        crawler_cls: type[Crawler],
         parser: HTMLParser,
         fun_registry: ProcessorRegistry,
         *,
@@ -61,13 +61,15 @@ class CrawlerWorker(BaseWorker):
         self.state = state_tree
         self.running = True
         self.strict = strict
-        self.crawler = crawler
+        self.crawler_cls = crawler_cls
+        self.crawlers = {}
         self.parser = parser
         self.fun_registry = fun_registry
         self.fetch_scheduler = fetch_scheduler
 
     def process(self, node: indexed_tree.Node) -> None:
         final_flag = False
+        self.create_crawlers(self.state)
         while True:
             working_node = self._check_scheduler(node)
             if working_node is node:
@@ -92,6 +94,10 @@ class CrawlerWorker(BaseWorker):
             if final_flag:
                 break
 
+    def create_crawlers(self, unique_domains: dict[str, indexed_tree.IndexedTree]) -> None:
+        for key in unique_domains:
+            self.crawlers[key] = self.crawler_cls(key, strict=self.strict)
+
 
     def _check_processing_step(self, url: str) -> bool:
         print(f"_check_processing_step: url {url}")
@@ -103,7 +109,7 @@ class CrawlerWorker(BaseWorker):
 
     def _enqueue_links(self, node: indexed_tree.Node, links: dict) -> None:
         print(f"_enqueue_links: node {node.id}, links: {links}")
-
+        parsed_url = urlparse(node.url).netloc
         for item in links.values():
             if not item:
                 continue
@@ -112,7 +118,7 @@ class CrawlerWorker(BaseWorker):
             for it in item:
                 url_type = get_url_base_path(node.url)
                 url_enum = get_enum_by_url(url_type)
-                new_node = self.state.add_node(
+                new_node = self.state[parsed_url].add_node(
                     parent=node,
                     url=it,
                     state=PipelineStateEnum.AWAITING_FETCH,
@@ -147,7 +153,7 @@ class CrawlerWorker(BaseWorker):
     def _fetch_html(self, url: str) -> str:
         print(f"_fetch_html: {url}")
         parsed_url = urlparse(url)
-        html = self.crawler.get_page(parsed_url.geturl())
+        html = self.crawlers[parsed_url.netloc].get_page(parsed_url.geturl())
         self.fetch_scheduler.mark_fetched(parsed_url.netloc)
         return html
 
@@ -160,7 +166,7 @@ class ProcessorWorker(BaseWorker):
         self,
         input_queue: Queue,
         output_queue: Queue,
-        state_tree: IndexedTree,
+        state_tree: dict[str, IndexedTree],
         parser: HTMLParser,
         transformer: PipelineTransformer,
         fun_registry: ProcessorRegistry,
@@ -226,7 +232,7 @@ class ProcessorWorker(BaseWorker):
     def _attach_state_values(
         self, node: indexed_tree.Node, parsed_data: dict, t_transformer: dict, state_pair: tuple,
     ) -> tuple:
-        state_dict = state_pair[0](node, self.state)
+        state_dict = state_pair[0](node, self.state[urlparse(node.url).netloc]) #Call function
         parsed_data.update(state_dict)
         t_transformer.update(dict.fromkeys(state_dict, state_pair[1]))
         return parsed_data, t_transformer
@@ -265,7 +271,7 @@ class LoaderWorker(BaseWorker):
     def __init__(
         self,
         input_queue: Queue,
-        state_tree: IndexedTree,
+        state_tree: dict[str,IndexedTree],
         db_conn: psycopg.Connection,
         fun_registry: ProcessorRegistry,
         *,
@@ -298,12 +304,14 @@ class LoaderWorker(BaseWorker):
             self.db_conn.commit()
 
     def _remove_if_children_completed(self, node: indexed_tree.Node):
+        parsed_url = urlparse(node.url).netloc
         keep_node = any(
-            self.state.find_node(child_id).state != PipelineStateEnum.COMPLETED
+            self.state[parsed_url].find_node(child_id).state \
+                    != PipelineStateEnum.COMPLETED
             for child_id in node.children
         )
         if not keep_node:
-            self.state.safe_remove_node(node.id, cascade_up=True)
+            self.state[parsed_url].safe_remove_node(node.id, cascade_up=True)
 
     def _load_item(self, item: LoaderObj) -> dict:
         page_enum = item.name
