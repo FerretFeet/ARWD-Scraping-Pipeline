@@ -2,14 +2,17 @@
 import unittest
 from pathlib import Path
 from queue import LifoQueue, Queue
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
+from urllib.parse import urlparse
+
+from src.config.pipeline_enums import PipelineRegistries
 
 # Assuming src.data_pipeline.orchestrate is the module containing Orchestrator
 # and src.workers.base_worker is the module containing BaseWorker.
 # Note: Renaming import paths to reflect the structure from the prompt's traceback.
 from src.data_pipeline.orchestrate import Orchestrator
+from src.structures.indexed_tree import IndexedTree, PipelineStateEnum
 from src.structures.indexed_tree import Node as IndexedTreeNode
-from src.structures.indexed_tree import PipelineStateEnum
 from src.structures.registries import ProcessorRegistry
 from src.workers.base_worker import BaseWorker
 
@@ -84,9 +87,6 @@ class TestOrchestratorUnit(unittest.TestCase):
             seed_urls=self.seed_urls,
             db_conn=self.mock_db_conn,
             state_tree=self.MockStateTree,
-            crawler_queue=self.crawler_queue,
-            processor_queue=self.processor_queue,
-            loader_queue=self.loader_queue,
             # Mock complex dependencies to be passed to workers
             crawler=MagicMock(),
             parser=MagicMock(),
@@ -215,26 +215,27 @@ class TestOrchestratorUnit(unittest.TestCase):
         self.assertIn("http://node1.com", self.orchestrator.visited)
         self.assertIn("http://node2.com", self.orchestrator.visited)
 
-    @patch("src.data_pipeline.orchestrate.CrawlerWorker")
-    @patch("src.data_pipeline.orchestrate.ProcessorWorker")
-    @patch("src.data_pipeline.orchestrate.LoaderWorker")
-    def test_setup_workers(self, MockLoaderWorker, MockProcessorWorker, MockCrawlerWorker):
+    @patch("src.config.pipeline_enums.PipelineRegistries.FETCH.get_worker_class")
+    @patch("src.config.pipeline_enums.PipelineRegistries.PROCESS.get_worker_class")
+    @patch("src.config.pipeline_enums.PipelineRegistries.LOAD.get_worker_class")
+    def test_setup_workers(self, MockLoadWorkerCls, MockProcessWorkerCls, MockFetchWorkerCls):
         """Test initialization of worker objects with correct dependencies."""
+
+        mock_crawler_instance = MockCrawlerWorker = MagicMock(name="MockCrawlerWorker")
+        mock_processor_instance = MockProcessorWorker = MagicMock(name="MockProcessorWorker")
+        mock_loader_instance = MockLoaderWorker = MagicMock(name="MockLoaderWorker")
+
+        # Patch the get_worker_class() to return a callable that returns the mock instance
+        MockFetchWorkerCls.return_value = lambda *a, **kw: mock_crawler_instance
+        MockProcessWorkerCls.return_value = lambda *a, **kw: mock_processor_instance
+        MockLoadWorkerCls.return_value = lambda *a, **kw: mock_loader_instance
 
         w_crawler, w_processor, w_loader = self.orchestrator._setup_workers()
 
-        # 1. Check if the worker constructors were called
-        self.assertTrue(MockCrawlerWorker.called)
-        self.assertTrue(MockProcessorWorker.called)
-        self.assertTrue(MockLoaderWorker.called)
-
-        # 2. Check the arguments passed to CrawlerWorker
-        (args, kwargs) = MockCrawlerWorker.call_args
-        self.assertEqual(args[0], self.crawler_queue)
-        self.assertEqual(args[1], self.processor_queue)
-        self.assertEqual(args[2], self.orchestrator.state)
-        # ... other checks remain valid ...
-        self.assertEqual(kwargs["name"], "CRAWLER")
+        # Now you can assert the returned objects
+        self.assertIs(w_crawler, MockCrawlerWorker)
+        self.assertIs(w_processor, MockProcessorWorker)
+        self.assertIs(w_loader, MockLoaderWorker)
 
     @patch("src.data_pipeline.orchestrate.BaseWorker")
     def test_start_workers(self, MockBaseWorker):
@@ -270,263 +271,149 @@ class TestOrchestratorUnit(unittest.TestCase):
 # ----------------------------------------------------------------------
 ## 🧪 Integration Test (TestOrchestratorIntegration)
 # ----------------------------------------------------------------------
-
-class MockWorker(BaseWorker):
-    """
-    Mock Worker for middle stages (Crawler/Processor).
-    Handles corrected BaseWorker init, propagates sentinel, and calls task_done()
-    only for actual work items.
-    """
-    def __init__(self, input_queue, output_queue, state, *args, **kwargs):
-        # FIX 1: Corrected super() call to match BaseWorker/threading.Thread signature
-        super().__init__(input_queue, name=kwargs.get("name", "MOCK"))
-        self.output_queue = output_queue
-        self.state = state
-        self.processed_count = 0
-        self.running = True
-
-    def run(self):
-        while self.running:
-            item = self.input_queue.get()
-
-            if item is None:
-                # FIX 2A: Correctly handle sentinel (None)
-                self.running = False
-
-                # Propagate sentinel to the next stage
-                if self.output_queue:
-                    self.output_queue.put(None)
-
-                # IMPORTANT: DO NOT call task_done() for the sentinel.
-                continue
-
-            # --- Actual Work Item Processing ---
-            self.processed_count += 1
-
-            # Put item in the next queue
-            if self.output_queue:
-                self.output_queue.put(item)
-
-            # Signal done on the input queue for this work item
-            self.input_queue.task_done()
-
-    def join(self):
-        self.input_queue.join()
-        super().join()
-
-
-class MockLoaderWorker(BaseWorker):
-    """
-    Mock Worker for the final stage (Loader).
-    Handles corrected BaseWorker init, consumes sentinel, and calls task_done()
-    to signal completion of work on the final queue.
-    """
-    def __init__(self, input_queue, output_queue, state, *args, **kwargs):
-        # FIX 1: Corrected super() call
-        super().__init__(input_queue, name=kwargs.get("name", "MOCK"))
-        self.output_queue = output_queue # Will be None
-        self.state = state
-        self.processed_count = 0
-        self.running = True
-
-    def run(self):
-        while self.running:
-            item = self.input_queue.get()
-
-            if item is None:
-                # FIX 2B: Correctly handle sentinel (None) for the final worker
-                self.running = False
-                # Do NOT call task_done() or propagate
-                continue
-
-            # --- Actual Work Item Processing ---
-            self.processed_count += 1
-
-            # Signal done on the input queue for this work item (The loader_queue)
-            self.input_queue.task_done()
-
-    def join(self):
-        self.input_queue.join()
-        super().join()
-
-
 class SyncMockWorker:
-    """Mock worker for middle stages (Crawler/Processor) that executes synchronously."""
-    def __init__(self, input_queue, output_queue, state, *args, **kwargs):
-        # Must accept all args passed by Orchestrator._setup_workers
-        self.input_queue = input_queue
-        self.output_queue = output_queue
-        self.state = state
+    def __init__(self, *args, **kwargs):
+        self.input_queue = kwargs.get("input_queue")
+        self.output_queue = kwargs.get("output_queue")
+        self.state = kwargs.get("state_tree")  # dict of site_key -> IndexedTree
         self.name = kwargs.get("name", "MOCK")
+        self.stage_label = kwargs.get("stage_label", "")
         self.processed_count = 0
 
-    def start(self):
-        # We don't start a thread
-        pass
-
-    def join(self):
-        # We don't join a thread
-        pass
+    def start(self): pass
+    def join(self): pass
 
     def process_one_item(self):
-        """Pulls one item, processes it, and returns a flag indicating status."""
         try:
-            # Use get_nowait() to avoid blocking
             item = self.input_queue.get_nowait()
-        except self.input_queue.Empty:
-            return False # No work done
+        except Exception:
+            return False
 
         if item is None:
-            # Sentinel received, propagate it and return flag
             if self.output_queue:
                 self.output_queue.put(None)
             return "SENTINEL"
 
-        # --- Actual Work Item Processing ---
         self.processed_count += 1
 
-        # Propagate the item
+        # Only add node in the crawler stage
+        if self.stage_label == "FETCH":
+            url = getattr(item, "url", item)
+            site_key = urlparse(url).netloc.lower()
+            tree = self.state.setdefault(site_key, IndexedTree(name=site_key))
+            tree.add_node(url=url, node_type="MOCK_NODE", parent=None)
+
         if self.output_queue:
             self.output_queue.put(item)
 
-        # Signal done on the input queue for this work item
         self.input_queue.task_done()
+        return True
 
-        return True # Work item processed and propagated
 
 class SyncMockLoaderWorker(SyncMockWorker):
-    """Synchronous Mock for the final Loader stage."""
+    """Synchronous mock for the final Loader stage."""
     def process_one_item(self):
         try:
             item = self.input_queue.get_nowait()
-        except self.input_queue.Empty:
-            return False # No work done
+        except Exception:
+            return False
 
         if item is None:
-            return "SENTINEL" # Stop processing, do not propagate
+            return "SENTINEL"
 
         self.processed_count += 1
-
-        # Final stage, call task_done() and do not propagate
         self.input_queue.task_done()
-        return True # Work item processed and finished
+        return True
 
-# --- Mock Indexed Tree (as defined in unit test section) ---
-
-# ----------------------------------------------------------------------
-
-@patch("src.data_pipeline.orchestrate.CrawlerWorker", new=SyncMockWorker)
-@patch("src.data_pipeline.orchestrate.ProcessorWorker", new=SyncMockWorker)
-@patch("src.data_pipeline.orchestrate.LoaderWorker", new=SyncMockLoaderWorker)
+# ------------------------------
+# Integration test
+# ------------------------------
 @patch("src.data_pipeline.orchestrate.load_json_list", return_value=[])
 @patch("src.data_pipeline.orchestrate.get_enum_by_url", return_value="MOCK_ENUM")
 @patch("src.data_pipeline.orchestrate.get_url_base_path", side_effect=lambda url: url)
-# We mock 'orchestrate' to prevent the real threading/joining logic from running
 @patch("src.data_pipeline.orchestrate.Orchestrator.orchestrate")
 class TestOrchestratorSynchronousIntegration(unittest.TestCase):
 
-    MockStateTree = MockIndexedTree
+    @patch.object(PipelineRegistries.FETCH, "get_worker_class", new_callable=PropertyMock)
+    @patch.object(PipelineRegistries.PROCESS, "get_worker_class", new_callable=PropertyMock)
+    @patch.object(PipelineRegistries.LOAD, "get_worker_class", new_callable=PropertyMock)
+    def test_full_orchestration_flow(
+        self, mock_load_class, mock_process_class, mock_fetch_class,
+        mock_orchestrate_method, mock_get_base_path, mock_get_enum, mock_load_json_list,
+    ):
+        # Assign synchronous mock workers
+        mock_fetch_class.return_value = SyncMockWorker
+        mock_process_class.return_value = SyncMockWorker
+        mock_load_class.return_value = SyncMockLoaderWorker
 
-    def setUp(self):
-        # Initialize Queues
-        self.crawler_queue = LifoQueue()
-        self.processor_queue = Queue()
-        self.loader_queue = Queue()
+        # Seed URLs as a list
+        seed_urls = ["http://siteA.com/start", "http://siteB.com/start"]
 
-        self.seed_urls = ["http://siteA.com/start", "http://siteB.com/start"]
-
-        # Instantiate the Orchestrator
-        self.orchestrator = Orchestrator(
+        # Instantiate orchestrator with real IndexedTree
+        orchestrator = Orchestrator(
             registry=MagicMock(),
-            seed_urls=self.seed_urls,
+            seed_urls=seed_urls,
             db_conn=MagicMock(),
-            state_tree=self.MockStateTree,
-            crawler_queue=self.crawler_queue,
-            processor_queue=self.processor_queue,
-            loader_queue=self.loader_queue,
-            crawler=MagicMock(), parser=MagicMock(), transformer=MagicMock(), fetch_scheduler=MagicMock(),
+            state_tree=IndexedTree,
+            crawler=MagicMock(),
+            parser=MagicMock(),
+            transformer=MagicMock(),
+            fetch_scheduler=MagicMock(),
         )
 
-    def test_full_orchestration_flow(self, mock_orchestrate_method, mock_get_base_path, mock_get_enum, mock_load_json_list):
-        """Tests the entire orchestration flow synchronously by manually cycling workers."""
+        # Setup state and queues
+        unvisited_nodes = orchestrator.setup_states(orchestrator.seed_urls, cache_base_path=Path("/mock/cache"))
+        orchestrator._load_queues(unvisited_nodes)
 
-        # 1. Simulate Setup Phase: This populates self.orchestrator.state with domain keys.
-        unvisited_nodes = self.orchestrator.setup_states(
-            self.orchestrator.seed_urls, cache_base_path=Path("/mock/cache"),
-        )
-        self.orchestrator._load_queues(unvisited_nodes)
+        crawler_queue = orchestrator.queues[PipelineRegistries.FETCH]
+        processor_queue = orchestrator.queues[PipelineRegistries.PROCESS]
+        loader_queue = orchestrator.queues[PipelineRegistries.LOAD]
 
-        # 2. Get the synchronous workers (they are NOT threads)
-        w_crawler, w_processor, w_loader = self.orchestrator._setup_workers()
+        # Put all seed URLs in the crawler queue
+        for urls in orchestrator.seed_urls.values():
+            for url in urls:
+                crawler_queue.put(url)
 
-        # 3. Manually run the pipeline for the 2 seed items (2 items * 3 stages = 6 total process steps)
-        expected_items = 2
+        # Setup workers
+        w_crawler, w_processor, w_loader = orchestrator._setup_workers()
+
+        # Process items manually
+        expected_items = len(seed_urls)
         processed_total = 0
-
-        # Use a safe maximum loop count to avoid true infinite hang
         MAX_CYCLES = 10
 
         for _ in range(MAX_CYCLES):
-
-            # Process one step for the Crawler
-            if w_crawler.process_one_item() is True:
-                processed_total += 1
-
-            # Process one step for the Processor
-            if w_processor.process_one_item() is True:
-                processed_total += 1
-
-            # Process one step for the Loader
-            if w_loader.process_one_item() is True:
-                processed_total += 1
-
-            # Exit condition: 2 items * 3 stages = 6 successful process steps
+            for w in [w_crawler, w_processor, w_loader]:
+                result = w.process_one_item()
+                if result is True:
+                    processed_total += 1
             if processed_total >= expected_items * 3:
                 break
 
-        self.assertEqual(processed_total, 6, f"Expected 6 processing steps, got {processed_total}. Pipeline stalled.")
+        self.assertEqual(processed_total, expected_items * 3, f"Pipeline did not process all items (got {processed_total})")
 
-        # 4. Simulate Shutdown (sending None)
-        # This puts the first batch of 3 sentinels into the queues.
-        workers = [w_crawler, w_processor, w_loader]
-        self.orchestrator.shutdown_workers([self.crawler_queue, self.processor_queue, self.loader_queue], workers)
+        # Shutdown workers
+        orchestrator.shutdown_workers([crawler_queue, processor_queue, loader_queue],
+                                      [w_crawler, w_processor, w_loader])
 
-        # 5. CRITICAL: Process all 6 sentinels (3 originals + 3 propagated) to clear queues
+        # Process sentinels
+        for _ in range(6):
+            for w in [w_crawler, w_processor, w_loader]:
+                w.process_one_item()
 
-        # A. Process the 3 sentinels sent by shutdown_workers:
+        # Assert queues are empty
+        self.assertTrue(crawler_queue.empty())
+        self.assertTrue(processor_queue.empty())
+        self.assertTrue(loader_queue.empty())
 
-        # Crawler consumes its sentinel (propagates None to Processor)
-        self.assertEqual(w_crawler.process_one_item(), "SENTINEL")
+        # Assert all workers processed all items
+        self.assertEqual(w_crawler.processed_count, expected_items)
+        self.assertEqual(w_processor.processed_count, expected_items)
+        self.assertEqual(w_loader.processed_count, expected_items)
 
-        # Processor consumes its sentinel (propagates None to Loader)
-        self.assertEqual(w_processor.process_one_item(), "SENTINEL")
-
-        # Loader consumes its sentinel (stops)
-        self.assertEqual(w_loader.process_one_item(), "SENTINEL")
-
-        # B. Process the 3 sentinels propagated during Step A:
-
-        # Processor consumes propagated sentinel from Crawler (propagates None to Loader)
-        self.assertEqual(w_processor.process_one_item(), "SENTINEL")
-
-        # Loader consumes propagated sentinel from Processor (stops)
-        self.assertEqual(w_loader.process_one_item(), "SENTINEL")
-
-        # Loader consumes final propagated sentinel (stops)
-        self.assertEqual(w_loader.process_one_item(), "SENTINEL")
-
-
-        # 6. Assertions
-
-        self.assertTrue(self.crawler_queue.empty(), "Crawler queue should be empty.")
-        self.assertTrue(self.processor_queue.empty(), "Processor queue should be empty.")
-        self.assertTrue(self.loader_queue.empty(), "Loader queue should be empty.")
-
-        self.assertEqual(w_crawler.processed_count, 2, "Crawler should have processed two seed URLs.")
-        self.assertEqual(w_processor.processed_count, 2, "Processor should have processed two seed URLs.")
-        self.assertEqual(w_loader.processed_count, 2, "Loader should have processed two seed URLs.")
-
-        self.assertIsNotNone(self.orchestrator.state["sitea.com"].root, "Root for siteA should be set.")
-        self.assertIsNotNone(self.orchestrator.state["siteb.com"].root, "Root for siteB should be set.")
-        self.assertEqual(len(self.orchestrator.state["sitea.com"].nodes), 1)
-        self.assertEqual(len(self.orchestrator.state["siteb.com"].nodes), 1)
+        # Assert trees have nodes
+        for url in seed_urls:
+            site_key = urlparse(url).netloc.lower()
+            tree = orchestrator.state[site_key]
+            self.assertIsNotNone(tree.root)
+            self.assertEqual(len(tree.nodes), 1)

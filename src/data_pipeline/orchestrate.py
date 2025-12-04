@@ -1,11 +1,12 @@
 """main.py."""
 from itertools import zip_longest
 from pathlib import Path
-from queue import LifoQueue, Queue
+from queue import Queue
 
 import psycopg
 from urllib3.util import parse_url
 
+from src.config.pipeline_enums import PipelineRegistries
 from src.config.settings import known_links_cache_file, state_cache_file
 from src.data_pipeline.extract.html_parser import HTMLParser
 from src.data_pipeline.extract.webcrawler import Crawler
@@ -17,7 +18,6 @@ from src.structures.registries import ProcessorRegistry, get_enum_by_url
 from src.utils.json_list import load_json_list
 from src.utils.strings.get_url_base_path import get_url_base_path
 from src.workers.base_worker import BaseWorker
-from src.workers.pipeline_workers import CrawlerWorker, LoaderWorker, ProcessorWorker
 
 STRICT = False
 
@@ -31,36 +31,37 @@ class Orchestrator:
         *,
         state_tree: type[indexed_tree.IndexedTree],
         strict: bool = False,
-        crawler_queue: LifoQueue | None = None,
-        processor_queue: Queue | None = None,
-        loader_queue: Queue | None = None,
         crawler: type[Crawler] = Crawler,
         parser: type[HTMLParser] = HTMLParser,
         transformer: type[PipelineTransformer] = PipelineTransformer,
         fetch_scheduler: type[FetchScheduler] = FetchScheduler,
     ) -> None:
         """Initialize the Orchestrator."""
+        self.registry = registry
+        self.db_conn = db_conn
+        self.strict = strict
         self.fetch_scheduler_cls = fetch_scheduler
         self.transformer_cls = transformer
         self.crawler_cls = crawler
         self.parser_cls = parser
-        self.registry = registry
-        self.db_conn = db_conn
-        self.strict = strict
-        self.crawler_queue = crawler_queue or LifoQueue()
-        self.processor_queue = processor_queue or Queue()
-        self.loader_queue = loader_queue or Queue()
-        self.visited: list = []
-        self._visited_nodes: list = []
-        __seed_urls = self.filter_seed_urls(
-            seed_urls, self.get_visited_urls(known_links_cache_file))
-        self.seed_urls: dict[str, list[str]] = self.organize_unique_domains(__seed_urls)
-
-        # self.state=state
         self.state_cls = state_tree
         self.state: dict[str, indexed_tree.IndexedTree] = {}
+        self.visited: list[str] = []
 
-        self.id_counter = 0
+        # Organize queues dynamically by stage
+        self.queues: dict[PipelineRegistries, Queue] = {
+            stage: stage.queue_type() for stage in PipelineRegistries
+        }
+
+        # Keep enum handy for iteration
+        self.pipeline_stages = list(PipelineRegistries)
+
+        # Seed URLs
+        known = self.get_visited_urls(known_links_cache_file)
+        __seed_urls = self.filter_seed_urls(seed_urls, known)
+        self.seed_urls = self.organize_unique_domains(__seed_urls)
+
+
 
     def orchestrate(self):
 
@@ -69,11 +70,12 @@ class Orchestrator:
 
         unvisited_nodes = self.setup_states(self.seed_urls, cache_base_path=state_cache_file)
         self._load_queues(unvisited_nodes)
-        w_crawler, w_processor, w_loader = self._setup_workers()
-        self.start_workers([w_crawler, w_processor, w_loader])
-        self.manage_workers(w_crawler, w_processor, w_loader)
-        self.shutdown_workers([self.crawler_queue, self.processor_queue, self.loader_queue],
-                              [w_crawler, w_processor, w_loader])
+        workers = self._setup_workers()
+        self.start_workers(workers)
+        queue_ordered_list = [self.queues[stage] for stage in PipelineRegistries]
+        self.manage_workers(workers, queue_ordered_list)
+        self.shutdown_workers(queue_ordered_list, workers)
+
 
 
     def shutdown_workers(self, queues: list[Queue], workers: list[BaseWorker]) -> None:
@@ -91,47 +93,88 @@ class Orchestrator:
             return None
         return self.seed_urls[match_key].pop(0)
 
-    def manage_workers(self, w_crawler: BaseWorker, w_processor: BaseWorker, w_loader: BaseWorker)\
-            -> None:
+    def manage_workers(self, workers: list[BaseWorker], ordered_queues: list[Queue]) -> None:
         """
         Manage workers.
 
         Once root url is finished scraping, wait for pipeline to finish, add new root link
         """
+        start_queue = ordered_queues[0]
         while True:
             for key, tree in self.state.items():
                 if tree.root is None:
                     next_url = self._next_seed(key)
                     if not next_url: continue
-                    self._enqueue_links(next_url, self.crawler_queue)
+                    self._enqueue_links(next_url, start_queue)
                     continue
-            if self.crawler_queue.empty():
+            if start_queue.empty():
                 break
-        self.crawler_queue.join()
-        self.processor_queue.join()
-        self.loader_queue.join()
+        for queue in ordered_queues:
+            queue.join()
+
 
     def start_workers(self, worker_list: list[BaseWorker]) -> None:
         """Start workers."""
         for worker in worker_list:
             worker.start()
 
+    def _setup_workers(self) -> list[BaseWorker]:
+        """Initialize workers dynamically from PipelineRegistries enum."""
+        workers: list[BaseWorker] = []
 
-    def _setup_workers(self) -> tuple[BaseWorker, BaseWorker, BaseWorker]:
-        """Initialize workers."""
-        crawler = self.crawler_cls
-        fetch_scheduler = self.fetch_scheduler_cls()
-        parser = self.parser_cls()
-        transformer = self.transformer_cls()
-        crawler_worker = CrawlerWorker(self.crawler_queue, self.processor_queue, self.state,
-                                       crawler, parser, self.registry, strict=self.strict,
-                                       fetch_scheduler=fetch_scheduler, name="CRAWLER")
-        processor_worker = ProcessorWorker(
-            self.processor_queue, self.loader_queue, self.state, parser, transformer, self.registry,
-            strict=self.strict, name="PROCESSOR")
-        loader_worker = LoaderWorker(self.loader_queue, self.state, self.db_conn, self.registry,
-                                     strict=self.strict, name="LOADER")
-        return crawler_worker, processor_worker, loader_worker
+        # Store last output queue for linking stages
+        last_queue = None
+
+        for stage in self.pipeline_stages:
+            input_queue = last_queue if last_queue else self.queues[stage]
+            # Determine output queue by the next stage, or None for last stage
+            idx = self.pipeline_stages.index(stage)
+            next_stage = (
+                self.pipeline_stages[idx + 1] if idx + 1 < len(self.pipeline_stages) else None
+            )
+            output_queue = self.queues[next_stage] if next_stage else None
+
+            worker_cls = stage.get_worker_class()
+            # Pass the minimal required arguments for now, can be expanded per worker
+            if stage is PipelineRegistries.FETCH:
+                worker = worker_cls(
+                    input_queue=input_queue,
+                    output_queue=output_queue,
+                    state_tree=self.state,
+                    crawler_cls=self.crawler_cls,
+                    parser=self.parser_cls(),
+                    fun_registry=self.registry,
+                    fetch_scheduler=self.fetch_scheduler_cls(),
+                    strict=self.strict,
+                    name=f"{stage.label}_WORKER",
+                )
+            elif stage is PipelineRegistries.PROCESS:
+                worker = worker_cls(
+                    input_queue=input_queue,
+                    output_queue=output_queue,
+                    state_tree=self.state,
+                    parser=self.parser_cls(),
+                    transformer=self.transformer_cls(),
+                    fun_registry=self.registry,
+                    strict=self.strict,
+                    name=f"{stage.label}_WORKER",
+                )
+            elif stage is PipelineRegistries.LOAD:
+                worker = worker_cls(
+                    input_queue=input_queue,
+                    state_tree=self.state,
+                    db_conn=self.db_conn,
+                    fun_registry=self.registry,
+                    strict=self.strict,
+                    name=f"{stage.label}_WORKER",
+                )
+            else:
+                raise ValueError(f"Unknown stage {stage}")
+
+            workers.append(worker)
+            last_queue = output_queue
+
+        return workers
 
 
 
@@ -139,13 +182,14 @@ class Orchestrator:
     def _load_queues(self, unvisited_nodes: list[indexed_tree.Node]) -> None:
         """Put starting values in queues."""
         root_items = {}
+        root_queue = self.queues[PipelineRegistries.FETCH]
         for key, item in self.state.items():
             #add items that werent loaded
             if item.root is None:
                 next_seed = self._next_seed(key)
-                self._enqueue_links(next_seed, self.crawler_queue)
+                self._enqueue_links(next_seed, root_queue)
         if unvisited_nodes:
-            self._enqueue_links(unvisited_nodes, self.crawler_queue)
+            self._enqueue_links(unvisited_nodes, root_queue)
 
 
 
@@ -172,7 +216,7 @@ class Orchestrator:
                 url=enqueue_list,
                 state=PipelineStateEnum.AWAITING_FETCH,
             )
-            self.crawler_queue.put(node)
+            queue.put(node)
             self.visited.append(enqueue_list)
 
         else:
