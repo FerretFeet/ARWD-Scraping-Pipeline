@@ -7,8 +7,8 @@ from src.utils.logger import logger
 
 
 class BaseWorker(threading.Thread):
-    def __init__(self, input_queue: Queue, *, name:str ="BaseWorker") -> None:
-        super().__init__(name=name)
+    def __init__(self, input_queue: Queue, *, isDaemon:bool = True, name:str ="BaseWorker") -> None:  # noqa: N803
+        super().__init__(name=name, daemon=isDaemon)
         self.input_queue = input_queue
 
     def fetch_next(self):

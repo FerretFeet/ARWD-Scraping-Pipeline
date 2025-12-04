@@ -22,6 +22,8 @@ from src.workers.base_worker import BaseWorker
 STRICT = False
 
 db_conn = ""
+
+# TODO: Increase parameterization by generalizing workers and worker-processing classes so each worker can be configured from registry.  # noqa: E501, FIX002, TD002, TD003
 class Orchestrator:
     def __init__(
         self,

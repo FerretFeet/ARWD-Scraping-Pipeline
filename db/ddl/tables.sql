@@ -1,17 +1,13 @@
--- =========================================
--- Tables for ARWD database
--- =========================================
 
 SET search_path TO :"SCRAPER_SCHEMA";
 
--- SESSIONS
+
 CREATE TABLE IF NOT EXISTS sessions (
     code VARCHAR(20) PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     start_date DATE NOT NULL
 );
 
--- BILLS
 CREATE TABLE IF NOT EXISTS bills (
     bill_id SERIAL PRIMARY KEY,
     bill_no VARCHAR(20) NOT NULL,
@@ -24,7 +20,6 @@ CREATE TABLE IF NOT EXISTS bills (
     UNIQUE(bill_no, fk_session_code)
 );
 
--- BILL DOCUMENTS
 CREATE TABLE IF NOT EXISTS bill_documents (
     doc_id SERIAL PRIMARY KEY,
     fk_bill_id INT NOT NULL,
@@ -34,7 +29,6 @@ CREATE TABLE IF NOT EXISTS bill_documents (
     FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id)
 );
 
--- LEGISLATORS
 CREATE TABLE IF NOT EXISTS legislators (
     legislator_id SERIAL PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
@@ -45,7 +39,6 @@ CREATE TABLE IF NOT EXISTS legislators (
     address TEXT
 );
 
--- LEGISLATOR HISTORY
 CREATE TABLE IF NOT EXISTS legislator_history (
     history_id SERIAL PRIMARY KEY,
     fk_legislator_id INT NOT NULL,
@@ -60,14 +53,12 @@ CREATE TABLE IF NOT EXISTS legislator_history (
     UNIQUE (fk_legislator_id, chamber, start_date)
 );
 
--- COMMITTEES
 CREATE TABLE IF NOT EXISTS committees (
     committee_id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     url TEXT
 );
 
--- COMMITTEE MEMBERSHIP
 CREATE TABLE IF NOT EXISTS committee_membership (
     committee_membership_id SERIAL PRIMARY KEY,
     fk_committee_id INT NOT NULL,
@@ -80,7 +71,6 @@ CREATE TABLE IF NOT EXISTS committee_membership (
     UNIQUE (fk_committee_id, fk_legislator_id, membership_start)
 );
 
--- SPONSORS
 CREATE TABLE IF NOT EXISTS sponsors (
     sponsor_id SERIAL PRIMARY KEY,
     sponsor_type sponsor_type NOT NULL,
@@ -97,7 +87,6 @@ CREATE TABLE IF NOT EXISTS sponsors (
     UNIQUE (fk_bill_id, fk_legislator_id, fk_committee_id)
 );
 
--- VOTE EVENTS
 CREATE TABLE IF NOT EXISTS vote_events (
     vote_event_id SERIAL PRIMARY KEY,
     fk_bill_id INT NOT NULL,
@@ -108,7 +97,6 @@ CREATE TABLE IF NOT EXISTS vote_events (
     UNIQUE (fk_bill_id, chamber, vote_timestamp)
 );
 
--- LEGISLATOR VOTES
 CREATE TABLE IF NOT EXISTS legislator_votes (
     vote_id SERIAL PRIMARY KEY,
     fk_vote_event_id INT NOT NULL,
@@ -119,5 +107,4 @@ CREATE TABLE IF NOT EXISTS legislator_votes (
     UNIQUE (fk_vote_event_id, fk_legislator_id)
 );
 
--- Optional index
 CREATE UNIQUE INDEX IF NOT EXISTS idx_legislators_name_url ON legislators (first_name, last_name, url);
