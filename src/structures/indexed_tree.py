@@ -99,6 +99,10 @@ class IndexedTree:
         if root:
             self.set_root(root)
 
+    def reset(self):
+        self.nodes: dict[int, Node] = {}
+        self.root
+
     def set_root(self, root: Node) -> None:
         """Set root tree."""
         self.nodes[root.id] = root

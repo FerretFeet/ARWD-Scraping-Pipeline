@@ -26,6 +26,9 @@ class BaseWorker(threading.Thread):
             item = self.fetch_next()
             if item is None:
                 break
+            if getattr(item, "state", None) == PipelineStateEnum.ERROR:
+                self.mark_done(item)
+                continue
             try:
                 self.process(item)
             except Exception as e:

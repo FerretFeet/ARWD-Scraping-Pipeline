@@ -1,78 +1,78 @@
-# # tests/integration/test_main.py
-# from unittest.mock import MagicMock, patch
-#
-# import pytest
-#
-# from src.data_pipeline import orchestrate
-# from src.structures.indexed_tree import PipelineStateEnum
-# from src.structures.registries import PipelineRegistryKeys
-#
-#
-# @pytest.fixture
-# def mock_environment():
-#     """Mock external dependencies for main."""
-#     with patch("src.data_pipeline.orchestrate.load_json_list") as mock_load_json, \
-#          patch("src.data_pipeline.orchestrate.Crawler") as mock_crawler_cls, \
-#          patch("src.data_pipeline.orchestrate.IndexedTree") as mock_tree_cls, \
-#          patch("src.data_pipeline.orchestrate.ProcessorWorker") as mock_processor_worker_cls, \
-#          patch("src.data_pipeline.orchestrate.LoaderWorker") as mock_loader_worker_cls:
-#
-#         # 1. Mock known links list
-#         mock_load_json.return_value = []
-#
-#         # 2. Mock Crawler to return fake HTML
-#         mock_crawler = MagicMock()
-#         mock_crawler.get_page.return_value = "<html></html>"
-#         mock_crawler_cls.return_value = mock_crawler
-#
-#         # 3. Mock IndexedTree to track nodes
-#         mock_tree = MagicMock()
-#         mock_node = MagicMock()
-#         mock_node.id = 1
-#         mock_node.url = "https://example.com"
-#         mock_node.state = PipelineStateEnum.AWAITING_FETCH
-#         mock_tree.add_node.return_value = mock_node
-#         mock_tree.root.url = "https://example.com"
-#         mock_tree.load_from_file.return_value = False  # simulate no saved state
-#         mock_tree_cls.return_value = mock_tree
-#
-#         # 4. Mock workers to run synchronously (no real threads)
-#         mock_worker = MagicMock()
-#         # Simulate .start() immediately calling run
-#         mock_worker.start.side_effect = lambda: mock_worker.run()
-#         mock_worker.run = MagicMock()
-#         mock_processor_worker_cls.return_value = mock_worker
-#         mock_loader_worker_cls.return_value = mock_worker
-#
-#         yield {
-#             "mock_load_json": mock_load_json,
-#             "mock_crawler": mock_crawler,
-#             "mock_tree": mock_tree,
-#             "mock_worker": mock_worker,
-#         }
-#
-# def test_main_runs(mock_environment):
-#     """Integration test for main function with mocked environment."""
-#     starting_urls = ["https://example.com"]
-#     orchestrate.main(starting_urls)
-#
-#     # ---- Assertions ----
-#
-#     # 1. Ensure IndexedTree.add_node was called for starting URL
-#     mock_environment["mock_tree"].add_node.assert_called_with(
-#         parent=None,
-#         url="https://example.com",
-#         node_type=PipelineRegistryKeys.ARK_LEG_SEEDER,
-#     )
-#
-#     # 2. Ensure Crawler.get_page was called
-#     mock_environment["mock_crawler"].get_page.assert_called()
-#
-#     # 3. Ensure workers were started
-#     mock_environment["mock_worker"].start.assert_called()
-#
-#     # 4. Ensure queues received at least one node
-#     fetch_queue_put_calls = [
-#         call.args[0] for call in mock_environment["mock_worker"].run.mock_calls
-#     ]
-#     assert fetch_queue_put_calls is not None or len(fetch_queue_put_calls) >= 0
+# tests/integration_test/src/data_pipeline/test_orchestrate.py
+from queue import LifoQueue, Queue
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.data_pipeline.orchestrate import Orchestrator
+from src.structures.indexed_tree import IndexedTree, PipelineStateEnum
+from src.structures.registries import ProcessorRegistry
+
+
+@pytest.fixture
+def empty_tree():
+    """Return an empty IndexedTree. Root will be created in Orchestrator."""
+    return IndexedTree()  # No root node yet
+
+@pytest.fixture
+def processor_registry():
+    """Provide a dummy processor registry"""
+    return ProcessorRegistry()
+
+@patch("src.data_pipeline.extract.webcrawler.Crawler.get_page", return_value="<html></html>")
+@patch("src.data_pipeline.extract.html_parser.HTMLParser.get_content")
+@patch("src.data_pipeline.transform.pipeline_transformer.PipelineTransformer.transform_content",
+       return_value={"dummy_field": "dummy_value"})
+@patch("src.structures.registries.ProcessorRegistry.get_processor")
+@patch("src.workers.pipeline_workers.LoaderWorker._remove_if_children_completed", lambda self, node: None)
+def test_orchestrator_full_flow(mock_get_processor, mock_transform, mock_parser, mock_crawler,
+                                empty_tree, processor_registry):
+    """
+    Full integration test of Orchestrator with real workers.
+    - Tree starts empty
+    - Root node created dynamically from seed URLs
+    - External I/O and DB are mocked
+    """
+
+    # Make parser return at least one child URL for each processed node
+    mock_parser.side_effect = lambda template, html: {"child_page": "https://arkleg.state.ar.us/Legislators/List"}
+
+    # Make registry always return a dummy processor template for all pages/stages
+    mock_get_processor.side_effect = lambda page_enum, stage: {"state_key": (lambda node, tree: {}, {})}
+
+    # Create orchestrator with multiple seed URLs
+    orchestrator = Orchestrator(
+        state=empty_tree,
+        registry=processor_registry,
+        seed_urls=["https://arkleg.state.ar.us/", "https://arkleg.state.ar.us/Bills/SearchByRange"],
+        db_conn=MagicMock(),  # mock DB connection
+        crawler_queue=LifoQueue(),
+        processor_queue=Queue(),
+        loader_queue=Queue(),
+        strict=False,
+    )
+
+    # Run the full pipeline
+    orchestrator.orchestrate()
+
+    # --- Assertions ---
+
+    # All queues should be empty
+    assert orchestrator.crawler_queue.empty()
+    assert orchestrator.processor_queue.empty()
+    assert orchestrator.loader_queue.empty()
+
+    # Tree should have at least the root node and its children
+    # All seeds should have been visited
+    assert len(orchestrator.visited) > 0
+    for url in ["https://arkleg.state.ar.us/", "https://arkleg.state.ar.us/Bills/SearchByRange"]:
+        assert url in orchestrator.visited
+
+    all_nodes = orchestrator._visited_nodes  # noqa: SLF001
+    assert len(all_nodes) > 0
+
+    # All nodes should be processed (some stage of FETCHED → COMPLETED)
+    for node in all_nodes:
+        assert node.state in (
+            PipelineStateEnum.COMPLETED,
+        )

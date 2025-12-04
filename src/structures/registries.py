@@ -18,9 +18,9 @@ class PipelineRegistryKeys(Enum):
 
 def get_enum_by_url(url: str) -> PipelineRegistryKeys:
     parsed_url = urlparse(url)
-    cleaned_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+    cleaned_url = f"{parsed_url.netloc}{parsed_url.path}"
 
-    cleaned_url = cleaned_url.rstrip("/")
+    # cleaned_url = cleaned_url.rstrip("/")
 
     # Sort the keys by length (longest value first) to ensure specific pages
     # (like 'Bills/Detail') match before generic ones (like 'Bills').
@@ -33,7 +33,7 @@ def get_enum_by_url(url: str) -> PipelineRegistryKeys:
         # The key sorting prevents the second example from misclassifying.
         if key.value in cleaned_url:
             return key
-    raise ValueError(f"URL '{url}' not found in PipelineRegistryKeys enum.")
+    raise ValueError(f"URL '{url}' -> '{cleaned_url}' not found in PipelineRegistryKeys enum.")
 
 class PipelineRegistries(Enum):
     """Enum defining pipeline registries. Pipeline steps."""
