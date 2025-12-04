@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 import pytest
 
+from src.data_pipeline.utils.fetch_scheduler import FetchScheduler
 from src.structures.indexed_tree import PipelineStateEnum
 from src.workers.pipeline_workers import (
     CrawlerWorker,
@@ -80,6 +81,7 @@ def worker(fake_tree, lifoqueues):
         state_tree=fake_tree,
         crawler=crawler,
         parser=parser,
+        fetch_scheduler=FetchScheduler(),
         fun_registry=registry,
         strict=False,
     )
@@ -148,6 +150,35 @@ class TestCrawlerWorker:
 
         # Must move to process queue
         assert process_q.qsize() == 1
+
+    # def test_process_success_waits_between_consec_same_requests(self, worker, fake_node,
+    #                                                             fake_tree, lifoqueues):
+    #     fetch_q, process_q = lifoqueues
+    #
+    #     # Simulated worker behavior
+    #     worker.crawler.get_page.return_value = "<html>"
+    #     worker.parser.get_content.return_value = {"links": ["A", "B"]}
+    #
+    #     # FETCH stage template
+    #     worker.fun_registry.get_processor.side_effect = [
+    #         {"fetch_template": True},  # FETCH
+    #         {"process_template": True},  # PROCESS (next step exists)
+    #         {"fetch_template": True},  # FETCH
+    #         {"process_template": True},  # PROCESS (next step exists)
+    #     ]
+    #     with patch("src.workers.pipeline_workers.time.sleep", new=MagicMock()) as mock_sleep:
+    #         worker.process(fake_node)
+    #         worker.process(fake_node)
+    #
+    #         # Must set state correctly
+    #         assert fake_node.state == PipelineStateEnum.AWAITING_PROCESSING
+    #
+    #         # Must insert HTML into node
+    #         assert fake_node.data["html"] == "<html>"
+    #
+    #         # Must move to process queue
+    #         assert process_q.qsize() == 2
+    #         mock_sleep.assert_called()
 
     def test_process_no_next_step(self, worker, fake_node, fake_tree):
         worker.crawler.get_page.return_value = "<html>"

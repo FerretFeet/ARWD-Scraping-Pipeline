@@ -8,6 +8,7 @@ from src.config.settings import known_links_cache_file, state_cache_file
 from src.data_pipeline.extract.html_parser import HTMLParser
 from src.data_pipeline.extract.webcrawler import Crawler
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
+from src.data_pipeline.utils.fetch_scheduler import FetchScheduler
 from src.structures import indexed_tree
 from src.structures.indexed_tree import PipelineStateEnum
 from src.structures.registries import PipelineRegistryKeys, ProcessorRegistry
@@ -107,11 +108,12 @@ class Orchestrator:
         """Initialize workers."""
         crawler = Crawler((get_url_base_path(self.state.root.url)).rsplit("/", 1)[0],
                           strict=self.strict)
+        fetch_scheduler = FetchScheduler()
         parser = HTMLParser()
         transformer = PipelineTransformer()
         crawler_worker = CrawlerWorker(self.crawler_queue, self.processor_queue, self.state,
                                        crawler, parser, self.registry, strict=self.strict,
-                                       name="CRAWLER")
+                                       fetch_scheduler=fetch_scheduler, name="CRAWLER")
         processor_worker = ProcessorWorker(
             self.processor_queue, self.loader_queue, self.state, parser, transformer, self.registry,
             strict=self.strict, name="PROCESSOR")

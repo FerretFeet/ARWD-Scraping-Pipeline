@@ -1,5 +1,5 @@
 """Thread workers for pipeline tasks."""
-
+import time
 from dataclasses import dataclass
 from queue import LifoQueue, Queue
 from urllib.parse import urlparse
@@ -9,6 +9,7 @@ import psycopg
 from src.data_pipeline.extract.html_parser import HTMLParser
 from src.data_pipeline.extract.webcrawler import Crawler
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
+from src.data_pipeline.utils.fetch_scheduler import FetchScheduler
 from src.structures import indexed_tree
 from src.structures.indexed_tree import IndexedTree, PipelineStateEnum
 from src.structures.registries import (
@@ -50,6 +51,7 @@ class CrawlerWorker(BaseWorker):
         parser: HTMLParser,
         fun_registry: ProcessorRegistry,
         *,
+        fetch_scheduler: FetchScheduler,
         strict: bool = False,
         name: str = "Crawler Worker",
     ) -> None:
@@ -62,22 +64,33 @@ class CrawlerWorker(BaseWorker):
         self.crawler = crawler
         self.parser = parser
         self.fun_registry = fun_registry
+        self.fetch_scheduler = fetch_scheduler
 
     def process(self, node: indexed_tree.Node) -> None:
-        self._set_state(node, PipelineStateEnum.FETCHING)
-        html = self._fetch_html(node.url)
-        links: dict = self._parse_html(node.url, html)
-        if links:
-            self._enqueue_links(node, links)
-        if self._check_processing_step(node.url):
-            print("Preparing for next step")
-            node.data["html"] = html
-            self._set_state(node, PipelineStateEnum.AWAITING_PROCESSING)
-            self.output_queue.put(node)
-            print("Finished preparing for next step")
-        else: # No next step, dont send to queue
-            self._set_state(node, PipelineStateEnum.COMPLETED)
-            print("No next step, finished.")
+        final_flag = False
+        while True:
+            working_node = self._check_scheduler(node)
+            if working_node is node:
+                final_flag = True
+            if not working_node:
+                time.sleep(self.fetch_scheduler.time_until_next())
+                continue
+            self._set_state(working_node, PipelineStateEnum.FETCHING)
+            html = self._fetch_html(working_node.url)
+            links: dict = self._parse_html(working_node.url, html)
+            if links:
+                self._enqueue_links(node, links)
+            if self._check_processing_step(working_node.url):
+                print("Preparing for next step")
+                working_node.data["html"] = html
+                self._set_state(working_node, PipelineStateEnum.AWAITING_PROCESSING)
+                self.output_queue.put(working_node)
+                print("Finished preparing for next step")
+            else: # No next step, dont send to queue
+                self._set_state(working_node, PipelineStateEnum.COMPLETED)
+                print("No next step, finished.")
+            if final_flag:
+                break
 
 
     def _check_processing_step(self, url: str) -> bool:
@@ -115,10 +128,28 @@ class CrawlerWorker(BaseWorker):
         template = get_registry_template(self.fun_registry, parser_enum, PipelineRegistries.FETCH)
         return self.parser.get_content(template, html) if template else None
 
+    def _check_scheduler(self, node: indexed_tree.Node) -> indexed_tree.Node | None:
+
+        domain = urlparse(node.url).netloc
+
+        priority_item: indexed_tree.Node = self.fetch_scheduler.pop_due()
+        if not priority_item and self.fetch_scheduler.can_fetch_now(domain): return node
+        if priority_item:
+            domain = urlparse(node.url).netloc
+            self.fetch_scheduler.schedule_retry(node,
+                                                self.fetch_scheduler.next_allowed_time(domain))
+            pi_domain = urlparse(priority_item.url).netloc
+            self.fetch_scheduler.mark_fetched(pi_domain)
+            return priority_item
+        return None
+
+
     def _fetch_html(self, url: str) -> str:
         print(f"_fetch_html: {url}")
         parsed_url = urlparse(url)
-        return self.crawler.get_page(parsed_url.geturl())
+        html = self.crawler.get_page(parsed_url.geturl())
+        self.fetch_scheduler.mark_fetched(parsed_url.netloc)
+        return html
 
 
 
