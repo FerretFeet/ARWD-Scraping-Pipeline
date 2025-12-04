@@ -1,0 +1,123 @@
+-- =========================================
+-- Tables for ARWD database
+-- =========================================
+
+SET search_path TO :"SCRAPER_SCHEMA";
+
+-- SESSIONS
+CREATE TABLE IF NOT EXISTS sessions (
+    code VARCHAR(20) PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    start_date DATE NOT NULL
+);
+
+-- BILLS
+CREATE TABLE IF NOT EXISTS bills (
+    bill_id SERIAL PRIMARY KEY,
+    bill_no VARCHAR(20) NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    fk_session_code VARCHAR(20) NOT NULL,
+    intro_date DATE NOT NULL,
+    act_date DATE,
+    FOREIGN KEY (fk_session_code) REFERENCES sessions(code),
+    UNIQUE(bill_no, fk_session_code)
+);
+
+-- BILL DOCUMENTS
+CREATE TABLE IF NOT EXISTS bill_documents (
+    doc_id SERIAL PRIMARY KEY,
+    fk_bill_id INT NOT NULL,
+    document_type doc_type NOT NULL,
+    url TEXT NOT NULL,
+    doc_date DATE,
+    FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id)
+);
+
+-- LEGISLATORS
+CREATE TABLE IF NOT EXISTS legislators (
+    legislator_id SERIAL PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    url TEXT NOT NULL,
+    phone VARCHAR(15),
+    email VARCHAR(120),
+    address TEXT
+);
+
+-- LEGISLATOR HISTORY
+CREATE TABLE IF NOT EXISTS legislator_history (
+    history_id SERIAL PRIMARY KEY,
+    fk_legislator_id INT NOT NULL,
+    district VARCHAR(10),
+    seniority INT,
+    chamber chamber,
+    party VARCHAR(50),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    FOREIGN KEY (fk_legislator_id) REFERENCES legislators(legislator_id),
+    CONSTRAINT chk_dates CHECK (end_date IS NULL OR end_date >= start_date),
+    UNIQUE (fk_legislator_id, chamber, start_date)
+);
+
+-- COMMITTEES
+CREATE TABLE IF NOT EXISTS committees (
+    committee_id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT
+);
+
+-- COMMITTEE MEMBERSHIP
+CREATE TABLE IF NOT EXISTS committee_membership (
+    committee_membership_id SERIAL PRIMARY KEY,
+    fk_committee_id INT NOT NULL,
+    fk_legislator_id INT NOT NULL,
+    membership_start DATE NOT NULL,
+    membership_end DATE,
+    FOREIGN KEY (fk_committee_id) REFERENCES committees(committee_id),
+    FOREIGN KEY (fk_legislator_id) REFERENCES legislators(legislator_id),
+    CONSTRAINT chk_dates CHECK (membership_end IS NULL OR membership_end >= membership_start),
+    UNIQUE (fk_committee_id, fk_legislator_id, membership_start)
+);
+
+-- SPONSORS
+CREATE TABLE IF NOT EXISTS sponsors (
+    sponsor_id SERIAL PRIMARY KEY,
+    sponsor_type sponsor_type NOT NULL,
+    fk_legislator_id INT,
+    fk_committee_id INT,
+    fk_bill_id INT NOT NULL,
+    FOREIGN KEY (fk_legislator_id) REFERENCES legislators(legislator_id),
+    FOREIGN KEY (fk_committee_id) REFERENCES committees(committee_id),
+    FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id),
+    CONSTRAINT chk_sponsor_exclusive CHECK (
+        (fk_legislator_id IS NOT NULL AND fk_committee_id IS NULL) OR
+        (fk_legislator_id IS NULL AND fk_committee_id IS NOT NULL)
+    ),
+    UNIQUE (fk_bill_id, fk_legislator_id, fk_committee_id)
+);
+
+-- VOTE EVENTS
+CREATE TABLE IF NOT EXISTS vote_events (
+    vote_event_id SERIAL PRIMARY KEY,
+    fk_bill_id INT NOT NULL,
+    vote_timestamp TIMESTAMPTZ NOT NULL,
+    chamber chamber NOT NULL,
+    motion_text TEXT,
+    FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id),
+    UNIQUE (fk_bill_id, chamber, vote_timestamp)
+);
+
+-- LEGISLATOR VOTES
+CREATE TABLE IF NOT EXISTS legislator_votes (
+    vote_id SERIAL PRIMARY KEY,
+    fk_vote_event_id INT NOT NULL,
+    fk_legislator_id INT NOT NULL,
+    vote_cast vote_type NOT NULL,
+    FOREIGN KEY (fk_vote_event_id) REFERENCES vote_events(vote_event_id),
+    FOREIGN KEY (fk_legislator_id) REFERENCES legislators(legislator_id),
+    UNIQUE (fk_vote_event_id, fk_legislator_id)
+);
+
+-- Optional index
+CREATE UNIQUE INDEX IF NOT EXISTS idx_legislators_name_url ON legislators (first_name, last_name, url);
