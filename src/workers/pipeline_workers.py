@@ -131,6 +131,7 @@ class CrawlerWorker(BaseWorker):
         parsed_url = get_url_base_path(url)
         parser_enum = get_enum_by_url(parsed_url)
         template = get_registry_template(self.fun_registry, parser_enum, PipelineRegistries.FETCH)
+        template = template.copy()
         return self.parser.get_content(template, html) if template else None
 
     def _check_scheduler(self, node: indexed_tree.Node) -> indexed_tree.Node | None:
