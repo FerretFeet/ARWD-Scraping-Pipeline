@@ -17,22 +17,32 @@ from tests.configs.html_fixture_params import (
 SELECTOR_TESTS = [
     {
         "fixture_params": LEGISLATOR_FIXTURE_PARAMS,
+        "fetch": False,
+        "process": True,
         "required_keys": ["title", "district", "seniority"],
     },
     {
         "fixture_params": LEGISLATOR_LIST_PARAMS,
+        "fetch": True,
+        "process": False,
         "required_keys": ["legislator_link"],
     },
     {
         "fixture_params": BILL_CATEGORY_FIXTURE_PARAMS,
+        "fetch": True,
+        "process": False,
         "required_keys": ["bill_cat_link"],
     },
     {
         "fixture_params": BILL_LIST_FIXTURE_PARAMS,
+        "fetch": True,
+        "process": False,
         "required_keys": ["chamber", "session", "bill_url"],
     },
     {
         "fixture_params": BILL_FIXTURE_PARAMS,
+        "fetch": False,
+        "process": True,
         "required_keys": [
             "title",
             "bill_no",
@@ -44,6 +54,8 @@ SELECTOR_TESTS = [
     },
     {
         "fixture_params": VOTE_PAGE_FIXTURE_PARAMS,
+        "fetch": False,
+        "process": True,
         "required_keys": ["title"],
     },
     # Add other selectors here...

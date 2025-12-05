@@ -19,7 +19,9 @@ class SelectorTemplate:
         """Initialize the selector template."""
         self.selectors = selectors
 
-
+    def copy(self):
+        """Return a copy of the selector template."""
+        return self.selectors.copy()
 
     def get_dynamic_state(self, node: indexed_tree.Node, state_tree: indexed_tree.IndexedTree,
                           data_attrs: dict | None, node_attrs: dict | None) -> dict | None:

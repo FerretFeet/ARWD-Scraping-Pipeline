@@ -72,6 +72,7 @@ def html_selector_fixture(request):
             "filename": filename,
             "url": url,
             "variant": variant,
+            "html": html_content,
         }
 
 

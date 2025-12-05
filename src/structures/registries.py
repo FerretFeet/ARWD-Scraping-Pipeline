@@ -66,10 +66,12 @@ class ProcessorRegistry:
     def get_processor(self, name: PipelineRegistryKeys, stage: PipelineRegistries) -> ProcessorType:
         """Retrieve a processor. Raises error if not found."""
         try:
-            return self._registry[name][stage]["processor"]
+            processor = self._registry[name][stage]["processor"]
+            if isinstance(processor, type):
+                return processor()
         except KeyError as err:
             msg = f"No processor found for {name.name} at stage {stage.name}"
-            raise ValueError(msg) from err
+            raise KeyError(msg) from err
 
     def get_all(self) -> dict:
         """Read-only view of the registry (optional utility)."""

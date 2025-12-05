@@ -236,11 +236,14 @@ class ProcessorWorker(BaseWorker):
         t_transformer.update(dict.fromkeys(state_dict, state_pair[1]))
         return parsed_data, t_transformer
 
-    def _get_processing_templates(self, url: str):
-        parsed_url = get_url_base_path(url)
-        parser_enum = get_enum_by_url(parsed_url)
-        __original_templates = get_registry_template(self.fun_registry, parser_enum,
-                                                     PipelineRegistries.PROCESS)
+    def _get_processing_templates(self, url_or_templates: str | dict):
+        if isinstance(url_or_templates, str):
+            parsed_url = get_url_base_path(url_or_templates)
+            parser_enum = get_enum_by_url(parsed_url)
+            __original_templates = get_registry_template(self.fun_registry, parser_enum,
+                                                         PipelineRegistries.PROCESS)
+        else:
+            __original_templates = url_or_templates
         if not __original_templates: return None, None, None
         parsing_templates = __original_templates.copy()
 

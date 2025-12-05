@@ -25,6 +25,11 @@ BILL_CATEGORY_FIXTURE_PARAMS = [
         "https://arkleg.state.ar.us/Bills/SearchByRange?ddBienniumSession=2003%2FR",
         "v3",
     ),
+    (
+        "bill_cat/page",
+        "https://arkleg.state.ar.us/Bills/SearchByRange?ddBienniumSession=2003%2FR",
+        "known",
+    ),
 ]
 BILL_FIXTURE_PARAMS = [
     (
@@ -41,6 +46,11 @@ BILL_FIXTURE_PARAMS = [
         "bill_page/bill",
         "https://www.arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2003%2FR",
         "v3",
+    ),
+    (
+        "bill_page/bill",
+        "https://www.arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2003%2FR",
+        "known",
     ),
 ]
 
@@ -59,6 +69,11 @@ BILL_LIST_FIXTURE_PARAMS = [
         "bill_list_page/bill_list",
         "https://www.arkleg.state.ar.us/Bills/ViewBills?&type=HB&ddBienniumSession=2003%2FR",
         "v3",
+    ),
+    (
+        "bill_list_page/bill_list",
+        "https://www.arkleg.state.ar.us/Bills/ViewBills?&type=HB&ddBienniumSession=2003%2FR",
+        "known",
     ),
 ]
 
@@ -83,6 +98,11 @@ VOTE_PAGE_FIXTURE_PARAMS = [
         "https://arkleg.state.ar.us/Bills/Votes?id=HB1001&rcs=10&chamber=Senate&ddBienniumSession=2003%2FR",
         "v4",
     ),
+    (
+        "vote_page/vote",
+        "https://arkleg.state.ar.us/Bills/Votes?id=HB1001&rcs=10&chamber=Senate&ddBienniumSession=2003%2FR",
+        "known",
+    ),
 ]
 
 LEGISLATOR_FIXTURE_PARAMS = [
@@ -101,11 +121,21 @@ LEGISLATOR_FIXTURE_PARAMS = [
         "https://arkleg.state.ar.us/Legislators/Detail?member=Bledsoe&ddBienniumSession=2017%2F2017R",
         "v3",
     ),
+    (
+        "legislator/legislator",
+        "https://arkleg.state.ar.us/Legislators/Detail?member=Bledsoe&ddBienniumSession=2017%2F2017R",
+        "known",
+    ),
 ]
 LEGISLATOR_LIST_PARAMS = [
     (
         "legislator/list",
         "https://arkleg.state.ar.us/Legislators/List",
         "v1",
+    ),
+    (
+        "legislator/list",
+        "https://arkleg.state.ar.us/Legislators/List",
+        "known",
     ),
 ]

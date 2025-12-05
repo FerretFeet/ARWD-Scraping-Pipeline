@@ -20,7 +20,7 @@
 #     with fixture_path.open(encoding="utf-8") as f:
 #         html = f.read()
 #         return BeautifulSoup(html, "html.parser")
-#
+
 #
 # class TestArStateLegislatorSelector:
 #     @patch.object(webcrawler.Crawler, "get_page")
