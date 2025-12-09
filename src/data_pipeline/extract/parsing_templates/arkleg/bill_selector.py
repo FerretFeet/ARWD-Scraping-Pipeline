@@ -6,7 +6,6 @@ import re
 from bs4 import BeautifulSoup
 
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
-from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.data_pipeline.transform.utils.transform_str_to_date import transform_str_to_date
 from src.models.selector_template import SelectorTemplate
@@ -39,26 +38,40 @@ class BillSelector(SelectorTemplate):
                 "lead_sponsor": (_BillParsers.parse_lead_sponsor, empty_transform),
                 "other_primary_sponsor": (
                     _BillParsers.parse_other_primary_sponsor,
-                    normalize_list_of_str_link,
+                    empty_transform,
                 ),
-                "cosponsors": (_BillParsers.parse_cosponsors, normalize_list_of_str_link),
+                "cosponsors": (_BillParsers.parse_cosponsors, empty_transform),
                 "intro_date": (_BillParsers.parse_intro_date, transform_str_to_date),
                 "act_date": (_BillParsers.parse_act_date, transform_str_to_date),
                 "vote_links": (_BillParsers.parse_vote_links, empty_transform),
-                "state_primary_sponsor": (self.primary_sponsor_lookup,
+                "state_primary_sponsor": (
+                    self.primary_sponsor_lookup,
+                    empty_transform,
+                ),
+                "state_cosponsors": (
+                    self.cosponsors_sponsor_lookup,
+                    empty_transform,
+                ),
+                "state_other_primary_sponsor": (
+                    self.other_primary_sponsor_lookup,
                     empty_transform,
                 ),
             },
         )
     def state_sponsor_lookup(self, node: Node, state_tree, parsed_data, pdkey):
         urls = parsed_data.get(pdkey)
+        if not urls:
+            return {pdkey: {}}
+
         returndict = {}
         for url in urls:
             if "committee" in url.lower():
                 rkey = "committee_id"
             elif "legislator" in url.lower():
                 rkey = "legislator_id"
-            else: return None
+            else:
+                return None
+
             found_node = self.get_dynamic_state(
                 node,
                 state_tree,
@@ -66,16 +79,20 @@ class BillSelector(SelectorTemplate):
                 {"url": html.unescape(url)},
             )
             if found_node:
-                if pdkey not in returndict:
-                    returndict[rkey] = {}
-                returndict[rkey] = found_node.data[rkey]
+                returndict.setdefault(rkey, []).append(found_node.data[rkey])
             else:
                 return None
+
         return {pdkey: returndict}
 
     def primary_sponsor_lookup(self, node, state_tree, parsed_data):
         return self.state_sponsor_lookup(node, state_tree, parsed_data, "lead_sponsor")
 
+    def cosponsors_sponsor_lookup(self, node, state_tree, parsed_data):
+        return self.state_sponsor_lookup(node, state_tree, parsed_data, "cosponsors")
+
+    def other_primary_sponsor_lookup(self, node, state_tree, parsed_data):
+        return self.state_sponsor_lookup(node, state_tree, parsed_data, "other_primary_sponsor")
 
 
 class _BillParsers:
@@ -191,9 +208,8 @@ class _BillParsers:
         return _BillParsers._parse_bill_detail_table(
             soup,
             label,
-            "text",
+            "href",
             nested_tag="a",
-            additional_attrs=["href"],
         )
 
     @staticmethod
@@ -207,9 +223,8 @@ class _BillParsers:
         return _BillParsers._parse_bill_detail_table(
             soup,
             label,
-            "text",
+            "href",
             nested_tag="a",
-            additional_attrs=["href"],
         )
 
     @staticmethod

@@ -38,6 +38,9 @@ def fake_state():
     billlistnode = state.add_new_node(unescape("https://arkleg.state.ar.us/Bills/ViewBills?type=HB"),
                                       PipelineRegistryKeys.BILL_LIST, [rootnode])
     comm.data = {"committee_id": 1}
+    leg1node.data = {"legislator_id": 1}
+    leg2node.data = {"legislator_id": 2}
+
     return state
 
 @pytest.fixture
@@ -86,17 +89,10 @@ class TestArStateLegislatorSelector:
             "/Acts/FTPDocument?path=%2FACTS%2F2025R%2FPublic%2F&file=3.pdf&ddBienniumSession=2025%2F2025R",
         ]
         assert result["orig_chamber"] == "house"
-        assert result["lead_sponsor"] == {"committee_id": 1}
+        assert result["lead_sponsor"] == {"committee_id": [1]}
 
-        # assert result["cosponsors"] == [
-        #     ("Lundstrum", "/Legislators/Detail?member=Lundstrum&ddBienniumSession=2025%2F2025R"),
-        #     ("C. Cooper", "/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R"),
-        # ]
-        # assert result["other_primary_sponsor"] == [
-        #     ("Lundstrum", "/Legislators/Detail?member=Lundstrum&ddBienniumSession=2025%2F2025R"),
-        #     ("C. Cooper", "/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R"),
-        #     ("House Management", "/Committees/Detail?code=963&ddBienniumSession=2025%2F2025R"),
-        # ]
+        assert result["cosponsors"] == {"legislator_id": [1, 2]}
+        assert result["other_primary_sponsor"] == {"committee_id": [1], "legislator_id": [1, 2]}
 
         assert result["intro_date"] == datetime.datetime(2025, 1, 13, 14, 39, 5, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
         assert result["act_date"] ==  datetime.datetime(2025, 1, 27, 0, 0, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
