@@ -101,3 +101,32 @@ class LegislatorListLinkSelector(SelectorTemplate):
                 ),
             },
         )
+
+class CommitteeCategories(SelectorTemplate):
+    """Selector template for ArkLeg BillCategory Page."""
+
+    def __init__(self) -> None:
+        """Initialize the selector template."""
+        super().__init__(
+            selectors={
+                "committee_categories": ("div#content div.container a", "href"),
+            },
+        )
+
+
+class CommitteeListLinkSelector(SelectorTemplate):
+    """Selector for Arkleg Legislator List Page."""
+
+    def __init__(self) -> None:
+        """Initialize the selector template."""
+        super().__init__(
+            selectors={
+                "committee": (
+                    "div#content div.container div.row a",
+                    "href",
+                ),
+                "next_page": ("div#content div.container > p a", "href"),
+            },
+        )
+#############33
+###### NEEDE TO CREATE NODES FOR COMMITTEES AND ASSOCIATE THEM WITH DB IDS

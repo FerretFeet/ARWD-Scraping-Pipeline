@@ -65,17 +65,21 @@ def fake_node():
 
 
 
-@pytest.fixture
-def fake_tree(fake_node):
-    tree = MagicMock()
-    tree.add_node.return_value = fake_node
-    return tree
 
 @pytest.fixture
 def fake_graph(fake_node):
     graph = MagicMock()
-    graph.add_node.return_value = fake_node
-    # graph.add_node.side_effect = graph.roots.add(fake_node)
+    graph.nodes = {}  # simulate real graph storage keyed by URL
+
+    def _add_new_node(url, node_type, incoming, **kwargs):
+        # Only create if not present
+        if url not in graph.nodes:
+            node = MagicMock(id=f"child-{url}")
+            graph.nodes[url] = node
+            return node
+        return graph.nodes[url]
+
+    graph.add_new_node.side_effect = _add_new_node
     return graph
 
 @pytest.fixture
@@ -130,6 +134,9 @@ class TestCrawlerWorker:
         fetch_q, _ = lifoqueues
         fake_graph.add_new_node.return_value = MagicMock(id="child")
         worker._enqueue_links(fake_node, {"links": ["url1", "url2"]})
+        worker._enqueue_links(fake_node, {"links": ["url1", "url2"]})
+
+
 
         # Should call add_node twice
         assert fake_graph.add_new_node.call_count == 2

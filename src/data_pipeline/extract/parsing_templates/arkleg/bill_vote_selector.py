@@ -1,5 +1,5 @@
 """Selector template for https://arkleg.state.ar.us/Bills/Votes?."""
-
+import html
 import re
 
 from bs4 import BeautifulSoup
@@ -8,6 +8,7 @@ from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.models.selector_template import SelectorTemplate
+from src.structures.directed_graph import Node
 
 
 class BillVoteSelector(SelectorTemplate):
@@ -39,6 +40,44 @@ class BillVoteSelector(SelectorTemplate):
                 ),
             },
         )
+
+        def state_vote_lookup(self, node: Node, state_tree, parsed_data, pdkey):
+            urls = parsed_data.get(pdkey)
+            if not urls:
+                return {pdkey: {}}
+
+            returndict = {}
+            for url in urls:
+                rkey = "legislator_id"
+
+                found_node = self.get_dynamic_state(
+                    node,
+                    state_tree,
+                    {rkey: None},
+                    {"url": html.unescape(url)},
+                )
+                if found_node:
+                    returndict.setdefault(rkey, []).append(found_node.data[rkey])
+                else:
+                    return None
+
+            return {pdkey: returndict}
+
+        def yea_lookup(self, node, state_tree, parsed_data):
+            return self.state_sponsor_lookup(node, state_tree, parsed_data, "yeas")
+
+        def nay_lookup(self, node, state_tree, parsed_data):
+            return self.state_sponsor_lookup(node, state_tree, parsed_data, "nays")
+
+        def nonvoting_lookup(self, node, state_tree, parsed_data):
+            return self.state_sponsor_lookup(node, state_tree, parsed_data, "nonvoting")
+
+        def present_lookup(self, node, state_tree, parsed_data):
+            return self.state_sponsor_lookup(node, state_tree, parsed_data, "present")
+
+        def excused_lookup(self, node, state_tree, parsed_data):
+            return self.state_sponsor_lookup(node, state_tree, parsed_data, "excused")
+
 
 
 class _VoteListParsers:

@@ -107,12 +107,15 @@ class CrawlerWorker(BaseWorker):
 
     def _enqueue_links(self, node: directed_graph.Node, links: dict) -> None:
         print(f"_enqueue_links: node {node.id}, links: {links}")
+        print(self.state.nodes)
         for item in links.values():
             if not item:
                 continue
             if not isinstance(item, list):
                 item = [item]  # noqa: PLW2901
             for it in item:
+                if it in self.state.nodes:
+                    continue
                 url_type = get_url_base_path(node.url)
                 url_enum = get_enum_by_url(url_type)
                 new_node = self.state.add_new_node(it, url_enum, [node],
@@ -135,6 +138,10 @@ class CrawlerWorker(BaseWorker):
 
         priority_item: directed_graph.Node = self.fetch_scheduler.pop_due()
         if not priority_item and self.fetch_scheduler.can_fetch_now(domain): return node
+        if not priority_item and self.fetch_scheduler.time_until_next() < 0.005:
+            while not self.fetch_scheduler.can_fetch_now(domain):
+                continue
+            return node
         if priority_item:
             domain = urlparse(node.url).netloc
             self.fetch_scheduler.schedule_retry(node,
