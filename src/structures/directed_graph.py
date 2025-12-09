@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
+from urllib3.util import parse_url
+
 from src.config.pipeline_enums import PipelineRegistryKeys
 from src.structures.indexed_tree import PipelineStateEnum
 from src.utils.logger import logger
@@ -43,7 +45,7 @@ class Node:
         self.data = data or {}
         self.url = unquote(url)
         self.type = node_type
-        self.container = {container}
+        self.container = container
 
         self.lock = threading.Lock()
 
@@ -53,23 +55,33 @@ class Node:
         else:
             self.state = state
 
+    def set_state(self, state: PipelineStateEnum) -> None:
+        with self.lock:
+            self.state = state
     def add_container(self, container_ref: Any) -> None:
-        self.container.add(container_ref)
+        with self.lock:
+            self.container = container_ref
 
     def add_incoming(self, incoming_ref: Any) -> None:
-        self.incoming.add(incoming_ref)
+        with self.lock:
+            self.incoming.add(incoming_ref)
 
     def add_outgoing(self, outgoing_ref: Any) -> None:
-        self.outgoing.add(outgoing_ref)
+        with self.lock:
+            self.outgoing.add(outgoing_ref)
 
     def remove_container(self, container_ref: Any) -> None:
-        self.container.remove(container_ref)
+        if self.container == container_ref:
+            with self.lock:
+                self.container = None
 
     def remove_incoming(self, incoming_ref: Any) -> None:
-        self.incoming.remove(incoming_ref)
+        with self.lock:
+            self.incoming.remove(incoming_ref)
 
     def remove_outgoing(self, outgoing_ref: Any) -> None:
-        self.outgoing.remove(outgoing_ref)
+        with self.lock:
+            self.outgoing.remove(outgoing_ref)
 
     def _isMatch(
         self,
@@ -109,7 +121,7 @@ class Node:
             "url": self.url,
             "data": self.data,
             "state": self.state.value,  # Store Enum as int
-            "container": [type(container).__name__ for container in self.container],
+            "container": [type(self.container).__name__],
         }
 
     def __repr__(self) -> str:
@@ -119,7 +131,7 @@ class Node:
             f"children={[child.id for child in self.outgoing] if self.outgoing else []}), "
             f"incoming={[incoming.id for incoming in self.incoming] if self.incoming else []}, "
             f"type={self.type}, url={self.url}), "
-            f"container={[type(con) for con in self.container] if self.container else None}, )"
+            f"container={[type(self.container)] if self.container else None}, )"
             f"data={self.data}, "
         )
 
@@ -137,6 +149,7 @@ class DirectionalGraph:
         """
         self.name = name
         self.nodes: OrderedDict[str, Node] = OrderedDict()
+        self.roots: set[Node] = set()
         if nodes is not None:
             self.load_node_list(nodes)
 
@@ -148,12 +161,14 @@ class DirectionalGraph:
     def reset(self):
         """Reset graph."""
         self.nodes: OrderedDict[str, Node] = OrderedDict()
+        self.roots: set[Node] = set()
 
     def add_new_node(self, url:str, node_type: PipelineRegistryKeys,
                      incoming: list[Node] | None, *, outgoing: list[Node] | None = None,
                      data: dict | None = None,
                      state: PipelineStateEnum = PipelineStateEnum.CREATED,
                      override_id: int | None = None,
+                     isRoot: bool = False,
                      ):
         """Create new node and add to graph."""
         new_node = Node(
@@ -167,23 +182,32 @@ class DirectionalGraph:
         )
         if incoming is not None:
             for link in incoming:
-                inlink = self.find_node(link.url)
+                inlink = self.find_node_by_url(link.url)
                 if inlink is not None:
                     inlink.add_outgoing(new_node)
         if outgoing is not None:
             for link in outgoing:
-                outlink = self.find_node(link.url)
+                outlink = self.find_node_by_url(link.url)
                 if outlink is not None:
                     outlink.add_incoming(new_node)
 
-        self.add_existing_node(new_node)
 
-    def add_existing_node(self, node: Node) -> None:
+        return self.add_existing_node(new_node, isRoot=isRoot)
+
+    def add_existing_node(self, node: Node, *, isRoot: bool = False) -> Node:  # noqa: N803
         """Add node to graph."""
         node.add_container(self)
         self.nodes[unquote(node.url)] = node
+        if isRoot:
+            if self.roots:
+                self.roots.add(node)
+            else:
+                self.roots = {node}
+        if len(node.incoming) > 0:
+            self.roots.add(node)
+        return node
 
-    def find_node(self, url: str) -> Node | None:
+    def find_node_by_url(self, url: str) -> Node | None:
         """Find node by url."""
         return self.nodes.get(unquote(url), None)
 
@@ -195,6 +219,8 @@ class DirectionalGraph:
             outnode.remove_incoming(delnode)
         for innode in list(delnode.incoming):
             innode.remove_outgoing(delnode)
+        if delnode in self.roots:
+            self.roots.remove(delnode)
         del delnode
 
     def cleanup(self) -> None:
@@ -203,6 +229,77 @@ class DirectionalGraph:
         for node in copied_nodes:
             if len(node.outgoing) == 0 and len(node.incoming) == 0:
                 self.delete_node(node)
+
+    def _propagate_completion(self, node: Node) -> bool:
+        """
+        Recursively checks child states, propagates completion to the parent node,
+        and removes the node if it's fully completed and has no remaining children.
+
+        Returns True if the node was safely removed, False otherwise.
+        """
+        # Check if the node is awaiting children (meaning its local work is done)
+        if (
+            node.state == PipelineStateEnum.AWAITING_CHILDREN
+            or node.set_state(PipelineStateEnum.COMPLETED)
+        ):
+            # Iterate over a copy because we might modify node.outgoing
+            children_to_remove = []
+            is_subtree_clean = True
+
+            for child in list(node.outgoing):
+                # Recursively check the child node
+                if self._propagate_completion(child):
+                    # If the child and its entire subtree were removed, flag it for parent removal
+                    children_to_remove.append(child)
+                else:
+                    # If the child is not complete OR its subtree is still busy, stop propagation
+                    is_subtree_clean = False
+
+            # 2. Cleanup Outgoing Links
+            for child in children_to_remove:
+                with node.lock:
+                    node.remove_outgoing(child)
+                # Remove the incoming link on the child from the parent (if your graph requires it)
+                # child.incoming.remove(node) # Assuming this is required in your Node class
+
+            # 3. State Propagation (Self-Completion)
+            if is_subtree_clean:
+                # All children are gone (or were already gone)
+                if node.state == PipelineStateEnum.AWAITING_CHILDREN:
+                    node.set_state(PipelineStateEnum.COMPLETED)  # Mark parent as completed
+
+                # 4. Final Removal Check (Only happens if self is COMPLETED and has no more outgoing links)
+                if node.state == PipelineStateEnum.COMPLETED and not node.outgoing:
+                    # Actual node deletion from the graph's main 'nodes' structure
+                    self.state.remove_node(node)  # Assumes your DirectionalGraph has this method
+                    return True  # Node successfully removed
+
+        # If state isn't AWAITING_CHILDREN/COMPLETED or subtree is not clean
+        return False
+
+    def safe_delete_root(self, root_url: str) -> bool:
+        """
+        Finds the root node associated with the URL and triggers recursive cleanup.
+
+        If the entire subtree is complete and removed, the root key is removed from
+        the Orchestrator's internal roots tracking.
+        """
+        parsed_netloc = parse_url(root_url).netloc
+        domain_key = unquote(parsed_netloc)
+
+        root_node = domain_key if domain_key in self.roots else None
+
+        if root_node is None:
+            return False
+
+        if self._propagate_completion(root_node):
+
+            node = self.roots.pop(domain_key)
+            del node
+            print(f"Successfully deleted entire graph subtree for domain: {domain_key}")
+            return True
+
+        return False
 
 
     def find_in_graph(self, url: str, data_attrs: dict | None = None,
@@ -213,20 +310,32 @@ class DirectionalGraph:
         return result
 
     def search_ancestors(self, node: Node, data_attrs: dict | None = None,
-                         node_attrs: dict | None = None, *,
-                         searched_nodes: set[Node] | None = None):
+                         node_attrs: dict | None = None):
+        return self._directional_search(node, data_attrs, node_attrs, searchUp=True)
+
+    def search_descendants(self, node: Node, data_attrs: dict | None = None,
+                           node_attrs: dict | None = None):
+        return self._directional_search(node, data_attrs, node_attrs, searchUp=False)
+
+    def _directional_search(self, node: Node, data_attrs: dict | None = None,
+                           node_attrs: dict | None = None, *,
+                            searchUp: bool = True,  # noqa: N803
+                           searched_nodes: set[Node] | None = None):
+
         searched_nodes = searched_nodes or set()
         if node in searched_nodes: return None
+
         if node._isMatch(data_attrs=data_attrs, node_attrs=node_attrs):  # noqa: SLF001
             return node
+
         searched_nodes.add(node)
-        for parent in node.incoming:
-            result = self.search_ancestors(parent, data_attrs, node_attrs,
-                                           searched_nodes=searched_nodes)
+        next_search = node.incoming if searchUp else node.outgoing
+        for next_node in next_search:
+            result = self._directional_search(next_node, data_attrs, node_attrs,
+                                           searched_nodes=searched_nodes, searchUp=searchUp)
             if result:
                 return result
         return None
-
 
     def to_JSON(self) -> str:  # noqa: N802
         """Serialize IndexedTree to a JSON string."""

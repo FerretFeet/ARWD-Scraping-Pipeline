@@ -1,6 +1,6 @@
 """Settings module."""
 
-from src.config.registry_config import PROCESSOR_CONFIG
+from src.config.registry_config import PROCESSOR_CONFIG, LOADER_CONFIG
 from src.structures.registries import ProcessorRegistry
 from src.utils.paths import project_root
 
@@ -17,7 +17,8 @@ config = {
 }
 
 PIPELINE_REGISTRY = ProcessorRegistry()
-PIPELINE_REGISTRY.load_config(PROCESSOR_CONFIG)
+PIPELINE_REGISTRY.load_p_config(PROCESSOR_CONFIG)
+PIPELINE_REGISTRY.load_l_config(LOADER_CONFIG)
 
 
 

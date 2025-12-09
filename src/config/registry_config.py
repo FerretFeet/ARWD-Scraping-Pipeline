@@ -1,3 +1,4 @@
+
 from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
 from src.data_pipeline.extract.fetching_templates.arkleg_fetchers import (
     ArkLegSeederLinkSelector,
@@ -19,6 +20,38 @@ from src.data_pipeline.extract.parsing_templates.arkleg.legislator_list_selector
 from src.data_pipeline.extract.parsing_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
+from src.utils.paths import project_root
+
+SQL_LOADER_BASE_PATH = project_root / "sql" / "dml"
+
+LOADER_CONFIG: dict = {
+
+    # PipelineRegistryKeys.BILL: {
+    #     "params": {
+    #         #Required parameters
+    #     },
+    #     "filepath": SQL_LOADER_BASE_PATH / "",
+    # },
+    #
+    # PipelineRegistryKeys.BILL_VOTE: {
+    #     "params": {},
+    #     "filepath": SQL_LOADER_BASE_PATH / "",
+    # },
+    #
+    PipelineRegistryKeys.LEGISLATOR: {
+        "params": {
+            "first_name",
+            "last_name",
+            "url",
+            "district",
+            "seniority",
+            "chamber",
+        },
+        "name": "Upsert Legislator",
+        "filepath": SQL_LOADER_BASE_PATH / "upsert_legislator.sql",
+    },
+}
+
 
 PROCESSOR_CONFIG: dict = {
     PipelineRegistryKeys.ARK_LEG_SEEDER: {

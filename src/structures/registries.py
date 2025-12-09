@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
+from src.data_pipeline.load.pipeline_loader import PipelineLoader
 
 
 def get_enum_by_url(url: str) -> PipelineRegistryKeys:
@@ -88,7 +89,7 @@ class ProcessorRegistry:
         """Return the queue type associated with this pipeline stage."""
         return stage.queue_type
 
-    def load_config(self, config: dict):
+    def load_p_config(self, config: dict):
         """
         Load a config mapping:
             {PipelineRegistryKey: {Stage: Processor}}
@@ -96,3 +97,17 @@ class ProcessorRegistry:
         for key, stage_map in config.items():
             for stage, processor in stage_map.items():
                 self.register(key, stage)(processor)
+
+
+    def load_l_config(self, config: dict):
+        """
+        Load a config mapping:
+            {PipelineRegistryKey: {Stage: Processor}}
+        """
+        for key, stage_map in config.items():
+            processor = PipelineLoader(stage_map["filepath"], stage_map["name"],
+                                       stage_map["params"])
+            self.register(key, PipelineRegistries.LOAD)(processor)
+            return
+        raise ValueError(f"No config found for {PipelineRegistries.LOAD}")
+

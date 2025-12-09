@@ -58,7 +58,12 @@ def fake_node():
 
         def __repr__(self):
             return "<Node 1>"
+
+        def set_state(self, state):
+            self.state = state
     return Node()
+
+
 
 @pytest.fixture
 def fake_tree(fake_node):
@@ -67,11 +72,18 @@ def fake_tree(fake_node):
     return tree
 
 @pytest.fixture
+def fake_graph(fake_node):
+    graph = MagicMock()
+    graph.add_node.return_value = fake_node
+    # graph.add_node.side_effect = graph.roots.add(fake_node)
+    return graph
+
+@pytest.fixture
 def lifoqueues():
     return LifoQueue(), LifoQueue()
 
 @pytest.fixture
-def worker(fake_tree, lifoqueues):
+def worker(fake_graph, lifoqueues):
     fetch_q, process_q = lifoqueues
     parser = MagicMock(spec=HTMLParser)
     registry = MagicMock()  # <- just remove spec
@@ -80,22 +92,23 @@ def worker(fake_tree, lifoqueues):
     mock_crawler_cls.return_value = mock_crawler_instance
 
     worker = CrawlerWorker(
-        fetch_queue=fetch_q,
-        process_queue=process_q,
-        state_tree={urlparse("https://arkleg.state.ar.us/").netloc: fake_tree},
+        input_queue=fetch_q,
+        output_queue=process_q,
+        state=fake_graph,
         crawler_cls=mock_crawler_cls,
         parser=parser,
         fun_registry=registry,
         fetch_scheduler=FetchScheduler(),
         strict=False,
     )
-    worker.create_crawlers(worker.state)
+    worker.create_crawlers(fake_graph.roots)
     return worker
 
 class TestCrawlerWorker:
 
     def test_fetch_html(self, worker, fake_node):
         domain = urlparse(fake_node.url).netloc
+        worker.create_crawlers({fake_node})
         crawler = worker.crawlers[domain]
         crawler.get_page.return_value = "<html>"
 
@@ -113,19 +126,20 @@ class TestCrawlerWorker:
         worker.parser.get_content.assert_called_once()
         assert result == {"links": ["a", "b"]}
 
-    def test_enqueue_links(self, worker, fake_tree, fake_node, lifoqueues):
+    def test_enqueue_links(self, worker, fake_graph, fake_node, lifoqueues):
         fetch_q, _ = lifoqueues
-        fake_tree.add_node.return_value = MagicMock(id="child")
+        fake_graph.add_new_node.return_value = MagicMock(id="child")
         worker._enqueue_links(fake_node, {"links": ["url1", "url2"]})
 
         # Should call add_node twice
-        assert fake_tree.add_node.call_count == 2
+        assert fake_graph.add_new_node.call_count == 2
         # Should enqueue both in fetch queue
         assert fetch_q.qsize() == 2
 
     def test_process_success(self, worker, fake_node, lifoqueues):
         fetch_q, process_q = lifoqueues
         domain = urlparse(fake_node.url).netloc
+        worker.create_crawlers({fake_node})
         worker.crawlers[domain].get_page.return_value = "<html>"
         worker.parser.get_content.return_value = {"links": ["A", "B"]}
         worker.fun_registry.get_processor.side_effect = [
@@ -141,6 +155,7 @@ class TestCrawlerWorker:
 
     def test_process_no_next_step(self, worker, fake_node):
         domain = urlparse(fake_node.url).netloc
+        worker.create_crawlers({fake_node})
         worker.crawlers[domain].get_page.return_value = "<html>"
         worker.parser.get_content.return_value = {"links": []}
         worker.fun_registry.get_processor.side_effect = [
@@ -154,6 +169,7 @@ class TestCrawlerWorker:
     def test_error_in_fetch_html(self, worker, fake_node, lifoqueues):
         fetch_q, process_q = lifoqueues
         domain = urlparse(fake_node.url).netloc
+        worker.create_crawlers({fake_node})
         worker.crawlers[domain].get_page.side_effect = Exception("fetch failed")
 
         fetch_q.put(None)
@@ -163,11 +179,13 @@ class TestCrawlerWorker:
         worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
+        assert process_q.get() == None
         assert process_q.qsize() == 0
 
     def test_error_in_parse_html(self, worker, fake_node, lifoqueues):
         fetch_q, process_q = lifoqueues
         domain = urlparse(fake_node.url).netloc
+        worker.create_crawlers({fake_node})
         worker.crawlers[domain].get_page.return_value = "<html>"
         worker.parser.get_content.side_effect = Exception("parse failed")
 
@@ -178,14 +196,17 @@ class TestCrawlerWorker:
         worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
+        assert process_q.get() == None
         assert process_q.qsize() == 0
 
     def test_error_in_enqueue_links(self, worker, fake_node, lifoqueues):
         fetch_q, process_q = lifoqueues
         domain = urlparse(fake_node.url).netloc
+        worker.create_crawlers({fake_node})
+        print(f"Worker crawler keys = {worker.crawlers.keys()}")
         worker.crawlers[domain].get_page.return_value = "<html>"
         worker.parser.get_content.return_value = {"links": ["A"]}
-        worker.state[domain].add_node.side_effect = Exception("tree failed")
+        worker.state.add_new_node.side_effect = Exception("tree failed")
 
         fetch_q.put(None)
         fetch_q.put(fake_node)
@@ -194,11 +215,12 @@ class TestCrawlerWorker:
         worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
+        assert process_q.get() == None
         assert process_q.qsize() == 0
 
 
 @pytest.fixture
-def processor_worker(fake_tree):
+def processor_worker(fake_graph):
     parser = MagicMock(spec=HTMLParser)
     transformer = MagicMock(spec=PipelineTransformer)
     registry = MagicMock()
@@ -207,7 +229,7 @@ def processor_worker(fake_tree):
     return ProcessorWorker(
         input_queue=input_q,
         output_queue=output_q,
-        state_tree={urlparse("https://arkleg.state.ar.us/").netloc: fake_tree},
+        state=fake_graph,
         parser=parser,
         transformer=transformer,
         fun_registry=registry,
@@ -216,11 +238,11 @@ def processor_worker(fake_tree):
 
 
 @pytest.fixture
-def loader_worker(fake_tree, fake_db_conn, fake_fun_registry):
+def loader_worker(fake_graph, fake_db_conn, fake_fun_registry):
     q = Queue()
     return LoaderWorker(
         input_queue=q,
-        state_tree={urlparse("https://arkleg.state.ar.us/").netloc: fake_tree},
+        state=fake_graph,
         db_conn=fake_db_conn,
         fun_registry=fake_fun_registry,
         strict=False,
@@ -299,19 +321,24 @@ class TestProcessorWorker:
         selector, transformer, state_pair = processor_worker._get_processing_templates("https://arkleg.state.ar.us/page")
         assert selector == {"a": "sel", "b": "sel2"}
         assert transformer == {"a": "tr", "b": "tr2"}
-        assert state_pair[0] is not None
+        assert state_pair is not None
+        assert list(state_pair.keys()) == ["state_key"]
+        value = state_pair["state_key"]
+        assert isinstance(value, tuple)
+        assert len(value) == 2
+        assert all(callable(v) for v in value)
 
 
 class TestLoaderWorker:
 
-    def test_process_success(self, loader_worker, fake_loader_obj, fake_db_conn, fake_tree):
+    def test_process_success(self, loader_worker, fake_loader_obj, fake_db_conn, fake_graph):
         loader_worker.process(fake_loader_obj)
 
         assert fake_loader_obj.node.state == PipelineStateEnum.COMPLETED
         assert fake_loader_obj.node.data == {"db_result": "ok"}
         fake_db_conn.commit.assert_called_once()
         fake_db_conn.rollback.assert_not_called()
-        fake_tree.safe_remove_node.assert_called_with(fake_loader_obj.node.id, cascade_up=True)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node)
 
     def test_process_load_returns_none(self, loader_worker, fake_loader_obj, fake_db_conn):
         loader_worker.fun_registry.get_processor.return_value = lambda params, db: None
@@ -332,20 +359,20 @@ class TestLoaderWorker:
         fake_db_conn.rollback.assert_called_once()
         fake_db_conn.commit.assert_called_once()
 
-    def test_remove_if_children_not_completed(self, loader_worker, fake_loader_obj, fake_tree):
+    def test_remove_if_children_not_completed(self, loader_worker, fake_loader_obj, fake_graph):
         child_node = MagicMock()
         child_node.state = PipelineStateEnum.PROCESSING
         fake_loader_obj.node.children.append("child_id")
-        fake_tree.find_node.return_value = child_node
+        fake_graph.find_node.return_value = child_node
 
-        loader_worker._remove_if_children_completed(fake_loader_obj.node)
-        fake_tree.safe_remove_node.assert_not_called()
+        loader_worker._remove_nodes(fake_loader_obj.node)
+        fake_graph.safe_remove_node.assert_not_called()
 
-    def test_remove_if_children_completed(self, loader_worker, fake_loader_obj, fake_tree):
+    def test_remove_if_children_completed(self, loader_worker, fake_loader_obj, fake_graph):
         child_node = MagicMock()
         child_node.state = PipelineStateEnum.COMPLETED
         fake_loader_obj.node.children.append("child_id")
-        fake_tree.find_node.return_value = child_node
+        fake_graph.find_node.return_value = child_node
 
-        loader_worker._remove_if_children_completed(fake_loader_obj.node)
-        fake_tree.safe_remove_node.assert_called_with(fake_loader_obj.node.id, cascade_up=True)
+        loader_worker._remove_nodes(fake_loader_obj.node)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node)

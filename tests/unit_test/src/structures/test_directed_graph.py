@@ -55,7 +55,7 @@ class TestNode:
 
     def test_state_enum_conversion(self, mock_logger):
         """Test that passing an integer state converts it to an Enum."""
-        node = self.Node(PipelineRegistryKeys.TYPE_A, "url", state=7)
+        node = self.Node(PipelineRegistryKeys.TYPE_A, "url", state=8)
         assert node.state == self.PipelineStateEnum.COMPLETED
 
     def test_is_match_logic(self, mock_logger):
@@ -125,7 +125,7 @@ class TestDirectionalGraph:
             incoming=[parent],
         )
 
-        child = graph.find_node("http://child")
+        child = graph.find_node_by_url("http://child")
 
         assert child is not None
         assert parent in child.incoming
@@ -165,9 +165,9 @@ class TestDirectionalGraph:
 
         graph.cleanup()
 
-        assert graph.find_node("orphan") is None
-        assert graph.find_node("root") is not None
-        assert graph.find_node("leaf") is not None
+        assert graph.find_node_by_url("orphan") is None
+        assert graph.find_node_by_url("root") is not None
+        assert graph.find_node_by_url("leaf") is not None
 
     # --- Ancestry Search Tests ---
 
@@ -231,8 +231,8 @@ class TestDirectionalGraph:
         graph.from_JSON(json_output)
 
         # Verify
-        loaded_n1 = graph.find_node("n1")
-        loaded_n2 = graph.find_node("n2")
+        loaded_n1 = graph.find_node_by_url("n1")
+        loaded_n2 = graph.find_node_by_url("n2")
 
         assert loaded_n1 is not None
         assert loaded_n1.data["val"] == 1
@@ -255,4 +255,4 @@ class TestDirectionalGraph:
         result = graph.load_from_file(fpath)
 
         assert result == 1
-        assert graph.find_node("file_test") is not None
+        assert graph.find_node_by_url("file_test") is not None

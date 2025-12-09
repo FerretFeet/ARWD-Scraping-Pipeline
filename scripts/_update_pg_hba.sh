@@ -1,22 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRAPER_USER="$1"
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $0 <ROLE_NAME>"
+    exit 1
+fi
 
-# Find the directory of the active pg_hba.conf
+ROLE="$1"
+
+# Find PostgreSQL configuration directory
 PG_CONF_DIR=$(sudo -u postgres psql -t -P format=unaligned -c "SHOW config_file" | xargs dirname)
 PG_HBA="$PG_CONF_DIR/pg_hba.conf"
 
-echo "Updating pg_hba.conf for SCRAPER_USER=$SCRAPER_USER..."
+echo "Updating pg_hba.conf for ROLE=$ROLE..."
 
 # Backup
 sudo cp "$PG_HBA" "$PG_HBA.bak"
 
-# Append line if it doesn’t exist
-grep -q "^host\s\+all\s\+$SCRAPER_USER\s\+127\.0\.0\.1/32\s\+md5" "$PG_HBA" || \
-    echo "host    all    $SCRAPER_USER    127.0.0.1/32    md5" | sudo tee -a "$PG_HBA" >/dev/null
+# Check if md5 line already exists for this role
+if ! grep -qE "^host\s+all\s+$ROLE\s+127\.0\.0\.1/32\s+md5" "$PG_HBA"; then
+    # Insert before first generic ident line
+    sudo sed -i "/^host\s\+all\s\+all\s\+127\.0\.0\.1\/32\s\+ident/i host    all    $ROLE    127.0.0.1/32    md5" "$PG_HBA"
+    echo "Added md5 line for $ROLE"
+else
+    echo "md5 line already exists for $ROLE"
+fi
 
-# Reload PostgreSQL
+# Optionally, also add IPv6 line
+if ! grep -qE "^host\s+all\s+$ROLE\s+::1/128\s+md5" "$PG_HBA"; then
+    sudo sed -i "/^host\s\+all\s\+all\s\+::1\/128\s\+ident/i host    all    $ROLE    ::1/128    md5" "$PG_HBA"
+    echo "Added IPv6 md5 line for $ROLE"
+else
+    echo "IPv6 md5 line already exists for $ROLE"
+fi
+
+# Reload PostgreSQL configuration
 sudo systemctl reload postgresql
 
 echo "pg_hba.conf updated successfully."

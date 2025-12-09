@@ -1,7 +1,4 @@
 
-SET search_path TO :"SCRAPER_SCHEMA";
-
-
 CREATE TABLE IF NOT EXISTS sessions (
     code VARCHAR(20) PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
