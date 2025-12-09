@@ -64,7 +64,8 @@ class ProcessorRegistry:
 
         return decorator
 
-    def get_processor(self, name: PipelineRegistryKeys, stage: PipelineRegistries) -> ProcessorType:
+    def get_processor(self, name: PipelineRegistryKeys, stage: PipelineRegistries)\
+            -> ProcessorType | PipelineLoader | None:
         """Retrieve a processor. Raises error if not found."""
         try:
             processor = self._registry[name][stage]["processor"]

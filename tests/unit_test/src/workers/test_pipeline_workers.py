@@ -37,7 +37,7 @@ def fake_loader_obj(fake_node):
 def fake_fun_registry():
     registry = MagicMock()
     loader_fun = MagicMock()
-    loader_fun.return_value = {"db_result": "ok"}
+    loader_fun.execute.return_value = {"db_result": "ok"}
     registry.get_processor.return_value = loader_fun
     return registry
 
@@ -249,12 +249,6 @@ def loader_worker(fake_graph, fake_db_conn, fake_fun_registry):
     )
 
 
-@pytest.fixture
-def fake_loader_obj(fake_node):
-    obj = LoaderObj(node=fake_node, name="PAGE_ENUM", params={"data": "value"})
-    return obj
-
-
 class TestProcessorWorker:
 
     def test_process_success(self, processor_worker, fake_node):
@@ -341,7 +335,11 @@ class TestLoaderWorker:
         fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node)
 
     def test_process_load_returns_none(self, loader_worker, fake_loader_obj, fake_db_conn):
-        loader_worker.fun_registry.get_processor.return_value = lambda params, db: None
+        fake_loader = MagicMock()
+        fake_loader.execute.return_value = None  # simulate SQL execution returning None
+
+        loader_worker.fun_registry.get_processor.return_value = fake_loader
+
         loader_worker.process(fake_loader_obj)
 
         assert fake_loader_obj.node.data is None
@@ -350,7 +348,11 @@ class TestLoaderWorker:
 
     def test_process_raises_exception(self, loader_worker, fake_loader_obj, fake_db_conn):
         def raise_error(params, db): raise Exception("DB error")
-        loader_worker.fun_registry.get_processor.return_value = raise_error
+
+        fake_loader = MagicMock()
+        fake_loader.execute.side_effect = Exception("DB error")
+
+        loader_worker.fun_registry.get_processor.return_value = fake_loader
 
         with pytest.raises(Exception) as excinfo:
             loader_worker.process(fake_loader_obj)

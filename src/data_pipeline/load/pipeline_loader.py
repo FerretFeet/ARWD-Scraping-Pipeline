@@ -1,31 +1,50 @@
 from pathlib import Path
 from typing import Any
 
+import psycopg
+
+from src.utils.logger import logger
+
 
 class PipelineLoader:
     """
     Configuration object for a specific database loading operation.
     """
 
-    def __init__(self, sql_file_path: Path, upsert_function_name: str, required_params: dict[str, type]):
+    def __init__(self, sql_file_path: Path, upsert_function_name: str,
+                 required_params: dict[str, type], *, strict: bool = False):
         self.sql_file_path: Path = sql_file_path
         self.upsert_function_name: str = upsert_function_name
         self.required_params: dict[str, type] = required_params
 
-        self._template: str | None = None
+        self.strict = strict
+        self._template = None
 
-    def validate_input(self, input_params: dict[str, Any]) -> None:
-        """Ensures all required keys are present in the input dictionary."""
+    def execute(self, params: dict, db_conn: psycopg.Connection) -> None | dict:
+        with db_conn.cursor() as cur:
+            cur.execute(self.sql_template, params)
+            db_conn.commit()
+            return cur.fetchone()
+
+
+    def validate_input(self, input_params: dict[str, Any]) -> bool:
+        """Ensure all required keys are present in the input dictionary."""
         missing_keys = [
             key for key in self.required_params
             if key not in input_params
         ]
-
         if missing_keys:
-            raise ValueError(
+            msg = (
                 f"Loader for {self.upsert_function_name} is missing required parameters: "
-                f"{', '.join(missing_keys)}",
+                f"{', '.join(missing_keys)}"
             )
+            logger.warning(msg)
+            if self.strict:
+                raise ValueError(
+                    msg,
+                )
+            return False
+        return True
 
     @property
     def sql_template(self) -> str:

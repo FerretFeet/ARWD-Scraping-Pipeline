@@ -313,6 +313,5 @@ class LoaderWorker(BaseWorker):
     def _load_item(self, item: LoaderObj) -> dict:
         page_enum = item.name
         loader_fun = self.fun_registry.get_processor(page_enum, PipelineRegistries.LOAD)
-        print(loader_fun)
-
-        return loader_fun(item.params, self.db_conn)
+        temp = loader_fun.execute(item.params, self.db_conn)
+        return temp
