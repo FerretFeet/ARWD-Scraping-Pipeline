@@ -10,6 +10,7 @@ from urllib3.util import parse_url
 from src.config.pipeline_enums import PipelineRegistryKeys
 from src.structures.indexed_tree import PipelineStateEnum
 from src.utils.logger import logger
+from src.utils.strings.normalize_url import normalize_url
 
 
 class Node:
@@ -83,6 +84,22 @@ class Node:
         with self.lock:
             self.outgoing.remove(outgoing_ref)
 
+    def _compare(self, val1, val2):
+        """Compare two values safely, with partial URL match."""
+        if isinstance(val1, str) and isinstance(val2, str):
+            # Treat strings starting with "/" or "http" as URLs
+            if val1.startswith("http") or val2.startswith("/"):
+                return normalize_url(val2) in normalize_url(val1)
+            return val1 == val2
+        if isinstance(val1, (int, float, bool)):
+            return val1 == val2
+        # Fallback for iterables
+        try:
+            return val2 in val1
+        except TypeError:
+            return val1 == val2
+
+
     def _isMatch(
         self,
         *,
@@ -101,13 +118,13 @@ class Node:
                     break
         if node_attrs:
             for key, value in node_attrs.items():
-                if key not in self.__dict__:
-                    should_visit = False
-                    break
-                node_value = getattr(self, key)
-                if value is not None and node_value != value:
-                    should_visit = False
-                    break
+                node_value = getattr(self, key, None)
+                print(f"testing match between {value} and {node_value}")
+
+                if value is not None and not self._compare(node_value, value):
+                    return False
+        print("should visit complete#$########")
+        print(should_visit)
         return should_visit
 
 
@@ -126,13 +143,22 @@ class Node:
 
     def __repr__(self) -> str:
         """Represent Node as string."""
+
+        def _shorten(val, max_len=50):
+            """Return a truncated string representation if too long."""
+            s = str(val)
+            if len(s) > max_len:
+                return s[:max_len] + "…"
+            return s
+
+        data_repr = {k: _shorten(v) for k, v in self.data.items()} if self.data else None
         return (
             f"\tNode(id={self.id}, state={self.state.name}, "
             f"children={[child.id for child in self.outgoing] if self.outgoing else []}), "
             f"incoming={[incoming.id for incoming in self.incoming] if self.incoming else []}, "
             f"type={self.type}, url={self.url}), "
             f"container={[type(self.container)] if self.container else None}, )"
-            f"data={self.data}, "
+            f"data={data_repr}, "
         )
 
 
@@ -302,12 +328,12 @@ class DirectionalGraph:
         return False
 
 
-    def find_in_graph(self, url: str, data_attrs: dict | None = None,
-                      node_attrs: dict | None = None) -> list[Node] | None:
+    def find_in_graph(self, data_attrs: dict | None = None,
+                      node_attrs: dict | None = None) -> Node | None:
         """Find node by node attrs or node data attrs."""
         result = [node for node in self.nodes.values()
                   if node._isMatch(data_attrs=data_attrs, node_attrs=node_attrs)]  # noqa: SLF001
-        return result
+        return result[0] if result else None
 
     def search_ancestors(self, node: Node, data_attrs: dict | None = None,
                          node_attrs: dict | None = None):

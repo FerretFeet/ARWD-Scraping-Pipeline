@@ -185,10 +185,12 @@ class ProcessorWorker(BaseWorker):
         if not t_parser or not t_transformer:
             msg = f"Expected parser and transformer templates for node {node} in processor worker"
             raise Exception(msg)  # noqa: TRY002
-        parsed_data = self._parse_html(node.url, node.data["html"])
+        parsed_data = self._parse_html(node.url, node.data["html"], t_parser)
         # --- Attach state values after parse, parser not able to handle
-        parsed_data, t_transformer = self._attach_state_values(node, parsed_data, t_transformer, state_pairs)
         transformed_data = self._transform_data(parsed_data, t_transformer)
+        temptemplates = self._attach_state_values(node, transformed_data, t_transformer, state_pairs)
+        if temptemplates is None:
+            return
         loader_obj = self._create_loader_object(transformed_data, node)
         if loader_obj:
             print(f"LOADER OBJ {loader_obj}")
@@ -227,12 +229,21 @@ class ProcessorWorker(BaseWorker):
     def _attach_state_values(
         self, node: directed_graph.Node, parsed_data: dict, t_transformer: dict,
             state_pairs: dict[str, tuple],
-    ) -> tuple:
+    ) -> dict | None:
         for key in state_pairs:
-            state_dict = state_pairs[key][0](node, self.state)
-            parsed_data.update(state_dict)  # Call function
-            t_transformer.update(dict.fromkeys(state_dict.keys(), state_pairs[key][1]))
-        return parsed_data, t_transformer
+            print(f"ATTACH STATE VALUES DEBUG"
+                  f"\n {key}: {state_pairs[key][0]}"
+                  f"\n {key}: {state_pairs[key][1]}")
+            state_dict = state_pairs[key][0](node, self.state, parsed_data)
+            if not state_dict:
+                #Wait for node data to be loaded
+                self.input_queue.put(node)
+                return None
+            print(f"DEBUG RETURN STATE DICT {state_dict}")
+            parsed_data.update(state_dict)
+            print(parsed_data)
+            t_transformer.update(state_dict)
+        return parsed_data
 
     def _get_processing_templates(self, url_or_templates: str | dict):
         if isinstance(url_or_templates, str):
@@ -257,13 +268,8 @@ class ProcessorWorker(BaseWorker):
         return selector_template, transformer_template, state_key_pairs
 
 
-    def _parse_html(self, url: str, html: str) -> dict:
-        print(f"_parse_html: {url}, {html[:20]}")
-        parsed_url = get_url_base_path(url)
-        parser_enum = get_enum_by_url(parsed_url)
-        template = self.fun_registry.get_processor(parser_enum, PipelineRegistries.FETCH)
-        print(f"template: {template}")
-        return self.parser.get_content(template, html)
+    def _parse_html(self, url: str, html: str, t_parse: dict) -> dict:
+        return self.parser.get_content(t_parse, html)
 
 
 

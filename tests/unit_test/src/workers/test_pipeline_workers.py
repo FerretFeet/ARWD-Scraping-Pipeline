@@ -255,7 +255,7 @@ class TestProcessorWorker:
         processor_worker.parser.get_content.return_value = {"parsed_key": "parsed_value"}
         processor_worker.transformer.transform_content.return_value = {"transformed_key": "transformed_value"}
         processor_worker.fun_registry.get_processor.return_value = {
-            "state_key": (lambda n, s: {"state_val": 123}, lambda x: "fn"),
+            "state_key": (lambda n, s, y: {"state_val": 123}, lambda x: "fn"),
             "title": ("sel", "tr"),
         }
 
@@ -268,15 +268,34 @@ class TestProcessorWorker:
         assert processor_worker.output_queue.get_nowait() == loader_obj
 
     def test_process_raises_on_invalid_loader(self, processor_worker, fake_node):
+        """
+        Ensure ProcessorWorker.process raises an exception when the loader object
+        cannot be created (i.e., transformed_data is None).
+        """
+
+        # Mock parser to return some parsed data
         processor_worker.parser.get_content.return_value = {"parsed_key": "parsed_value"}
-        processor_worker.transformer.transform_content.return_value = None
-        processor_worker.fun_registry.get_processor.return_value = {
-            "state_key": (lambda n, s: {"state_val": 123}, lambda x: "fn"),
-            "test_key": ("sel", "tr"),
-        }
+
+        # Patch _get_processing_templates to return valid templates
+        processor_worker._get_processing_templates = MagicMock(
+            return_value=(
+                {"title": lambda html: "parsed"},  # selector_template
+                {"title": lambda x: x},  # transformer_template
+                {},  # state_key_pairs
+            ),
+        )
+
+        # Patch _transform_data to return None, forcing loader creation failure
+        processor_worker._transform_data = MagicMock(return_value=None)
+
+        # Ensure _attach_state_values returns a dict so we reach loader creation
+        processor_worker._attach_state_values = MagicMock(
+            return_value={"parsed_key": "parsed_value"},
+        )
 
         with pytest.raises(Exception) as excinfo:
             processor_worker.process(fake_node)
+
         assert "loader obj not able to be created" in str(excinfo.value)
 
     def test_error_in_parse_html(self, processor_worker, fake_node):

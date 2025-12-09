@@ -1,14 +1,22 @@
 # import re
+# from queue import Queue
 # from unittest.mock import patch
 #
 # import pytest
 # from bs4 import BeautifulSoup
-# from src.data_pipeline.extract.selector_templates.arkleg.legislator_selector import (
+#
+# from src.config.pipeline_enums import PipelineRegistryKeys
+# from src.config.settings import PIPELINE_REGISTRY
+# from src.data_pipeline.extract import webcrawler
+# from src.data_pipeline.extract.html_parser import HTMLParser
+# from src.data_pipeline.extract.parsing_templates.arkleg.legislator_selector import (
 #     LegislatorSelector,
 # )
-#
-# from src.data_pipeline.extract import webcrawler
+# from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
+# from src.structures.directed_graph import DirectionalGraph
 # from src.utils.paths import project_root
+# from src.workers.pipeline_workers import ProcessorWorker
+#
 #
 #
 # @pytest.fixture(scope="session")
@@ -20,12 +28,13 @@
 #     with fixture_path.open(encoding="utf-8") as f:
 #         html = f.read()
 #         return BeautifulSoup(html, "html.parser")
-
+#
 #
 # class TestArStateLegislatorSelector:
 #     @patch.object(webcrawler.Crawler, "get_page")
 #     def test_known_legislator_known_return(self, mock_get_page, known_legislator_soup_fixture):
 #         selector = LegislatorSelector("/stem/")
+#         process_worker =
 #         crawler = webcrawler.Crawler("")
 #         rel_url = "/return/path"
 #         mock_get_page.return_value = known_legislator_soup_fixture

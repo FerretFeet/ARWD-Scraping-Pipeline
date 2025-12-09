@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 
-from src.structures import directed_graph, indexed_tree
+from src.structures import directed_graph
 
 Selector = str | tuple[str, str] | Callable[[BeautifulSoup], list[str] | None]
 
@@ -23,13 +23,16 @@ class SelectorTemplate:
         """Return a copy of the selector template."""
         return self.selectors.copy()
 
-    def get_dynamic_state(self, node: indexed_tree.Node,
+    def get_dynamic_state(self, node: directed_graph.Node,
                           state: directed_graph.DirectionalGraph,
-                          data_attrs: dict | None, node_attrs: dict | None) -> dict | None:
+                          data_attrs: dict | None, node_attrs: dict | None) -> directed_graph.Node | None:
         """
         Retrieve state for the node from the state_tree dynamically.
 
         This function can be customized to fetch values based on node type or state_key.
         """
-        # Example logic: walk up the tree to find the relevant state
-        return state.search_ancestors(node, data_attrs, node_attrs)
+        print(f"in get dynamic state {node}, \n\nnode_attrs {node_attrs}")
+        print(f"\n\n\n State is {state}")
+        print(f"STATE NODES IS {state.nodes}")
+        return state.find_in_graph(data_attrs, node_attrs)
+

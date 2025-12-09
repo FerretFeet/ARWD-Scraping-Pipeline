@@ -33,8 +33,8 @@ class BillVoteSelector(SelectorTemplate):
                     normalize_list_of_str_link,
                 ),
                 "state": (
-                    lambda node, state_tree: self.get_dynamic_state(node, state_tree,
-                                                        {"bill_id": None}, None),
+                    lambda node, state_tree, parsed_data: self.get_dynamic_state(node, state_tree,
+                                            {"bill_id": None}, None),
                     empty_transform,
                 ),
             },
