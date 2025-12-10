@@ -1,6 +1,8 @@
 """Selector template for https://arkleg.state.ar.us/Bills/Votes?."""
 import html
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 
@@ -17,7 +19,7 @@ class BillVoteSelector(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "title": (("div h1"), normalize_str),
+                "title": ("div h1", _VoteListTransformers.transform_vote_title),
                 "yea_voters": (_VoteListParsers.parse_yea_names, empty_transform),
                 "nay_voters": (_VoteListParsers.parse_nay_names, empty_transform),
                 "non_voting_voters": (
@@ -32,51 +34,86 @@ class BillVoteSelector(SelectorTemplate):
                     _VoteListParsers.parse_excused_names,
                     empty_transform,
                 ),
-                "state": (
-                    lambda node, state_tree, parsed_data: self.get_dynamic_state_from_parents(node, state_tree,
-                                            {"bill_id": None}, None),
+                "state_bill_id": (
+                    lambda node, state_tree, parsed_data: self.get_dynamic_state_from_parents(
+                        node, state_tree, {"bill_id": None}, None,
+                    ).data,
                     empty_transform,
                 ),
+                "state_yea_voter_lookup": (self.yea_lookup, empty_transform),
+                "state_nay_voter_lookup": (self.nay_lookup, empty_transform),
+                "state_present_voter_lookup": (self.present_lookup, empty_transform),
+                "state_nonvoting_voter_lookup": (self.nonvoting_lookup, empty_transform),
+                "state_excused_voter_lookup": (self.excused_lookup, empty_transform),
             },
         )
 
-        def state_vote_lookup(self, node: Node, state_tree, parsed_data, pdkey):
-            urls = parsed_data.get(pdkey)
-            if not urls:
-                return {pdkey: {}}
+    def state_vote_lookup(self, node: Node, state_tree, parsed_data, pdkey):
+        urls = parsed_data.get(pdkey)
+        print(f"DEBUG STATE VOTE LOOKUP {urls}")
+        if not urls:
+            return {pdkey: {}}
 
-            returndict = {}
-            for url in urls:
-                rkey = "legislator_id"
+        returnlist = []
+        for url in urls:
+            rkey = "legislator_id"
 
-                found_node = self.get_dynamic_state(
-                    node,
-                    state_tree,
-                    {rkey: None},
-                    {"url": html.unescape(url)},
-                )
-                if found_node:
-                    returndict.setdefault(rkey, []).append(found_node.data[rkey])
-                else:
-                    return None
+            found_node = self.get_dynamic_state(
+                node,
+                state_tree,
+                {rkey: None},
+                {"url": html.unescape(url)},
+            )
+            print(f"STATE VOTE FOUND NODE {found_node}")
+            if found_node:
+                returnlist.append(found_node.data[rkey])
+            else:
+                return None
+        print(f"STATE VOTE FOUND NODES {len(returnlist)}")
+        return {pdkey: returnlist}
 
-            return {pdkey: returndict}
+    def yea_lookup(self, node, state_tree, parsed_data):
+        return self.state_vote_lookup(node, state_tree, parsed_data, "yea_voters")
 
-        def yea_lookup(self, node, state_tree, parsed_data):
-            return self.state_sponsor_lookup(node, state_tree, parsed_data, "yeas")
+    def nay_lookup(self, node, state_tree, parsed_data):
+        return self.state_vote_lookup(node, state_tree, parsed_data, "nay_voters")
 
-        def nay_lookup(self, node, state_tree, parsed_data):
-            return self.state_sponsor_lookup(node, state_tree, parsed_data, "nays")
+    def nonvoting_lookup(self, node, state_tree, parsed_data):
+        return self.state_vote_lookup(node, state_tree, parsed_data, "non_voting_voters")
 
-        def nonvoting_lookup(self, node, state_tree, parsed_data):
-            return self.state_sponsor_lookup(node, state_tree, parsed_data, "nonvoting")
+    def present_lookup(self, node, state_tree, parsed_data):
+        return self.state_vote_lookup(node, state_tree, parsed_data, "present_voters")
 
-        def present_lookup(self, node, state_tree, parsed_data):
-            return self.state_sponsor_lookup(node, state_tree, parsed_data, "present")
+    def excused_lookup(self, node, state_tree, parsed_data):
+        return self.state_vote_lookup(node, state_tree, parsed_data, "excused_voters")
 
-        def excused_lookup(self, node, state_tree, parsed_data):
-            return self.state_sponsor_lookup(node, state_tree, parsed_data, "excused")
 
+class _VoteListTransformers:
+    @staticmethod
+    def transform_vote_title(vote_title_list: list[str], *, strict:bool = False,
+                             tz_name: str="America/Chicago"):
+        """
+        Take a list like ['House Vote - Tuesday, February 5, 2013 1:43:39 PM'].
+        
+        returns a dict with keys: vote_timestamp (datetime) and chamber (str)
+        """
+        if not vote_title_list or not vote_title_list[0]:
+            return {"vote_timestamp": None, "chamber": None}
+        text = vote_title_list[0] if isinstance(vote_title_list, list) else vote_title_list
+
+        # Extract chamber (House or Senate)
+        chamber_match = re.match(r"(House|Senate) Vote", text)
+        chamber = chamber_match.group(1) if chamber_match else None
+
+        # Extract timestamp part (everything after the first ' - ')
+        try:
+            timestamp_str = text.split(" - ", 1)[1]
+            naive_dt = datetime.strptime(timestamp_str, "%A, %B %d, %Y %I:%M:%S %p")  # noqa: DTZ007
+            vote_timestamp = naive_dt.replace(tzinfo=ZoneInfo(tz_name))
+        except (IndexError, ValueError):
+            vote_timestamp = None
+
+        return {"vote_timestamp": vote_timestamp, "chamber": normalize_str(chamber)}
 
 
 class _VoteListParsers:
@@ -115,7 +152,7 @@ class _VoteListParsers:
         for a in vote_container.find_all("a"):
             rattr = a.get(attr)
             # text = a.get_text(strip=True)
-            result.append(rattr)
+            result.append(html.unescape(rattr))
         return result
 
     @staticmethod

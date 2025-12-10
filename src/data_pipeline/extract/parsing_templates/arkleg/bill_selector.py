@@ -58,6 +58,7 @@ class BillSelector(SelectorTemplate):
                 ),
             },
         )
+
     def state_sponsor_lookup(self, node: Node, state_tree, parsed_data, pdkey):
         urls = parsed_data.get(pdkey)
         if not urls:
