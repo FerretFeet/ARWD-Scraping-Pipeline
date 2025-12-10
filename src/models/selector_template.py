@@ -36,3 +36,14 @@ class SelectorTemplate:
         print(f"STATE NODES IS {state.nodes}")
         return state.find_in_graph(data_attrs, node_attrs)
 
+    def get_dynamic_state_from_parents(self, node: directed_graph.Node,
+                          state: directed_graph.DirectionalGraph,
+                          data_attrs: dict | None, node_attrs: dict | None) -> directed_graph.Node | None:
+        """
+        Retrieve state for the node from the state_tree dynamically.
+
+        This function can be customized to fetch values based on node type or state_key.
+        """
+        return state.search_ancestors(node, data_attrs, node_attrs)
+
+

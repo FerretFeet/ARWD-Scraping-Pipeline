@@ -29,12 +29,210 @@ def _insert_legislator(db, first, last, url, phone=None, email=None, address=Non
 # ===========================================================================
 
 class TestUpsertLegislator:
+    # ----------------------------------------------------------------------
+    # Helper Setup Function
+    # ----------------------------------------------------------------------
+    def _insert_committee(self, db, name, url=None):
+        """Helper to insert/upsert a committee and return its ID."""
+        db.execute(
+            """
+                   INSERT INTO committees (name, url)
+                   VALUES (%s, %s)
+                       ON CONFLICT (name) DO UPDATE SET
+                       url = COALESCE(EXCLUDED.url, committees.url)
+                                                 RETURNING committee_id;
+                   """,
+            (name, url),
+        )
+        return db.fetchone()["committee_id"]
+
+    # ----------------------------------------------------------------------
+    # 10.1 Insertion
+    # ----------------------------------------------------------------------
+
+    def test_insert_new_committees_on_first_upsert(self, db):
+        # Setup: Create necessary committee IDs
+        ag_id = self._insert_committee(db, "Agriculture")
+        budget_id = self._insert_committee(db, "Budget")
+
+        # Insert new legislator with memberships
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Katie', 'Lee', 'u10', '1', 'k@k', 'a',
+                    '1', 1, 'house', 'D', '2020-01-01', ARRAY[%s, %s]
+                );
+            """,
+            (ag_id, budget_id),
+        )
+
+        # Assert: Two committee membership records exist
+        db.execute("SELECT COUNT(*) FROM committee_membership;")
+        assert db.fetchone()["count"] == 2
+
+        # Assert: Check start date matches p_start_date
+        db.execute("SELECT membership_start FROM committee_membership ORDER BY membership_start;")
+        results = [str(r["membership_start"]) for r in db.fetchall()]
+        assert results == ["2020-01-01", "2020-01-01"]
+
+    def test_re_running_upsert_does_not_duplicate_memberships(self, db):
+        ag_id = self._insert_committee(db, "Agriculture-B")
+
+        # First Call
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Sam', 'Wise', 'u11', '1', 's@s', 'a',
+                    '1', 1, 'house', 'D', '2021-01-01', ARRAY[%s]
+                );
+            """,
+            (ag_id,),
+        )
+
+        # Second Call (same data, same date)
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Sam', 'Wise', 'u11', '1', 's@s', 'a',
+                    '1', 1, 'house', 'D', '2021-01-01', ARRAY[%s]
+                );
+            """,
+            (ag_id,),
+        )
+
+        # Assert: Only one membership record should exist
+        db.execute("SELECT COUNT(*) FROM committee_membership;")
+        assert db.fetchone()["count"] == 1
+
+    # ----------------------------------------------------------------------
+    # 10.2 Syncing / Closing Logic (The Core SCD-2 for Memberships)
+    # ----------------------------------------------------------------------
+
+    def test_existing_memberships_are_closed_if_removed_from_list(self, db):
+        # Setup: Insert Legislator
+        leg_id = _insert_legislator(db, "Sync", "Test", "u12")
+        finance_id = self._insert_committee(db, "Finance")
+        judiciary_id = self._insert_committee(db, "Judiciary")
+
+        # Initial Membership (2020-01-01): Finance and Judiciary are active
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Sync', 'Test', 'u12', '1', 'z', 'a',
+                    '1', 1, 'house', 'D', '2020-01-01', ARRAY[%s, %s]
+                );
+            """,
+            (finance_id, judiciary_id),
+        )
+
+        # Second Call (2021-01-01): Only Finance remains. Judiciary is dropped.
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Sync', 'Test', 'u12', '1', 'z', 'a',
+                    '1', 1, 'house', 'D', '2021-01-01', ARRAY[%s]
+                );
+            """,
+            (finance_id,),
+        )
+
+        # Assert 1: Three records in total (2 old, 1 new)
+        db.execute("SELECT COUNT(*) FROM committee_membership;")
+        assert db.fetchone()["count"] == 3
+
+        # Assert 2: Judiciary membership must be closed
+        db.execute(
+            "SELECT membership_end FROM committee_membership WHERE fk_committee_id = %s AND membership_start = '2020-01-01';",
+            (judiciary_id,),
+        )
+        jud_end_date = db.fetchone()["membership_end"]
+        assert str(jud_end_date) == "2020-12-31", (
+            "Judiciary membership should be closed the day before the new start date"
+        )
+
+        # Assert 3: Finance membership from 2020 must be closed (SCD-2 transition)
+        db.execute(
+            "SELECT membership_end FROM committee_membership WHERE fk_committee_id = %s AND membership_start = '2020-01-01';",
+            (finance_id,),
+        )
+        fin_old_end_date = db.fetchone()["membership_end"]
+        assert str(fin_old_end_date) == "2020-12-31", (
+            "Finance 2020 membership should be closed to start 2021 membership"
+        )
+
+        # Assert 4: Finance membership from 2021 must be OPEN
+        db.execute(
+            "SELECT membership_end FROM committee_membership WHERE fk_committee_id = %s AND membership_start = '2021-01-01';",
+            (finance_id,),
+        )
+        fin_new_end_date = db.fetchone()["membership_end"]
+        assert fin_new_end_date is None, "Finance 2021 membership must be open"
+
+    def test_new_membership_is_inserted_if_it_was_previously_closed(self, db):
+        leg_id = _insert_legislator(db, "Rejoin", "Test", "u13")
+        science_id = self._insert_committee(db, "Science")
+
+        # 1. Initial Membership (2018-01-01): Science is active
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Rejoin', 'Test', 'u13', '1', 'z', 'a',
+                    '1', 1, 'house', 'D', '2018-01-01', ARRAY[%s]
+                );
+            """,
+            (science_id,),
+        )
+
+        # 2. Sync (2019-01-01): Science is removed (closed)
+        db.execute("""
+                SELECT upsert_legislator(
+                    'Rejoin', 'Test', 'u13', '1', 'z', 'a',
+                    '1', 1, 'house', 'D', '2019-01-01', ARRAY[]::INT[] -- Empty array removes all
+                );
+            """)
+
+        # 3. Rejoin (2020-01-01): Science is added back
+        db.execute(
+            """
+                SELECT upsert_legislator(
+                    'Rejoin', 'Test', 'u13', '1', 'z', 'a',
+                    '1', 1, 'house', 'D', '2020-01-01', ARRAY[%s]
+                );
+            """,
+            (science_id,),
+        )
+
+        # Assert 1: Three records in total for Science (Old open, closed, new open)
+        db.execute(
+            "SELECT COUNT(*) FROM committee_membership WHERE fk_committee_id = %s;", (science_id,),
+        )
+        assert db.fetchone()["count"] == 3
+
+        # Assert 2: Check the three status transitions
+        db.execute(
+            """
+                   SELECT membership_start, membership_end FROM committee_membership
+                   WHERE fk_committee_id = %s
+                   ORDER BY membership_start;
+                   """,
+            (science_id,),
+        )
+        results = db.fetchall()
+
+        assert str(results[0]["membership_start"]) == "2018-01-01"
+        assert str(results[0]["membership_end"]) == "2018-12-31"  # Closed in step 2
+
+        assert str(results[1]["membership_start"]) == "2019-01-01"
+        assert str(results[1]["membership_end"]) == "2019-12-31"  # Closed in step 3
+
+        assert str(results[2]["membership_start"]) == "2020-01-01"
+        assert results[2]["membership_end"] is None  # New open record
 
     # ----------------------------------------------------------------------
     # 1. Basic Insert (Happy Path)
     # ----------------------------------------------------------------------
 
-    # Assuming the connection object 'db' is a cursor or wrapper that handles execution and fetching.
+
 
     def test_insert_new_legislator_creates_history(self, db):
         db.execute("""

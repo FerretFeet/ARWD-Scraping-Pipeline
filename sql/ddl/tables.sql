@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS legislators (
     legislator_id SERIAL PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    url TEXT NOT NULL,
     phone VARCHAR(15),
     email VARCHAR(120),
     address TEXT
@@ -42,6 +41,7 @@ CREATE TABLE IF NOT EXISTS legislator_history (
     district VARCHAR(10),
     seniority INT,
     chamber chamber,
+    url TEXT NOT NULL,
     party VARCHAR(50),
     start_date DATE NOT NULL,
     end_date DATE,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS legislator_history (
 
 CREATE TABLE IF NOT EXISTS committees (
     committee_id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     url TEXT
 );
 
@@ -104,4 +104,4 @@ CREATE TABLE IF NOT EXISTS legislator_votes (
     UNIQUE (fk_vote_event_id, fk_legislator_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_legislators_name_url ON legislators (first_name, last_name, url);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_legislators_name ON legislators (first_name, last_name);

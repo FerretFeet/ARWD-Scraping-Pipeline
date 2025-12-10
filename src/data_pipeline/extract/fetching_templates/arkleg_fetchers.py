@@ -25,12 +25,21 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
         )
 
     @staticmethod
-    def parse_bill_section(soup: BeautifulSoup) -> list[str] | None:
+    def parse_section(soup: BeautifulSoup, matchstr: str) -> list[str] | None:
         """Select bills section links."""
         for a in soup.select("li a:first-child"):
             if a.get_text(strip=True).lower() == "bill":
                 return a.get("href")
         return None
+    @staticmethod
+    def parse_bill_section(soup: BeautifulSoup) -> list[str] | None:
+        """Select bills section links."""
+        return ArkLegSeederLinkSelector.parse_section(soup, "bill")
+    @staticmethod
+    def parse_committee_section(soup: BeautifulSoup) -> list[str] | None:
+        """Select bills section links."""
+        return ArkLegSeederLinkSelector.parse_section(soup, "committees")
+
 
 
 class BillSectionLinkSelector(SelectorTemplate):
@@ -109,9 +118,15 @@ class CommitteeCategories(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "committee_categories": ("div#content div.container a", "href"),
+                "committee_categories": ("", "href"),
             },
         )
+    @staticmethod
+    def parse_committee_categories(soup: BeautifulSoup) -> list[str] | None:
+        for a in soup.select("div#content div.container a"):
+            if a.get_text(strip=True).lower() in ["joint", "senate", "house", "task force"]:
+                return a.get("href")
+        return None
 
 
 class CommitteeListLinkSelector(SelectorTemplate):
@@ -128,5 +143,3 @@ class CommitteeListLinkSelector(SelectorTemplate):
                 "next_page": ("div#content div.container > p a", "href"),
             },
         )
-#############33
-###### NEEDE TO CREATE NODES FOR COMMITTEES AND ASSOCIATE THEM WITH DB IDS

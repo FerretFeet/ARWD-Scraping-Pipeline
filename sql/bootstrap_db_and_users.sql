@@ -20,20 +20,25 @@ SELECT pg_reload_conf();
 ---
 
 -- 2. CREATE DATABASES (if they don't exist)
-DO $$
-DECLARE
-    -- Access variables using the 'vars.' prefix
-    db_name text := current_setting('vars.DB_NAME');
-    test_db_name text := current_setting('vars.TEST_DB_NAME');
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = db_name) THEN
-        EXECUTE format('CREATE DATABASE %I ENCODING ''UTF8''', db_name);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = test_db_name) THEN
-        EXECUTE format('CREATE DATABASE %I ENCODING ''UTF8''', test_db_name);
-    END IF;
-END
-$$;
+SELECT format(
+    'CREATE DATABASE %I ENCODING ''UTF8''',
+    current_setting('vars.DB_NAME')
+)
+WHERE NOT EXISTS (
+    SELECT FROM pg_database WHERE datname = current_setting('vars.DB_NAME')
+)
+\gexec
+
+
+-- Create test database if it does not exist
+SELECT format(
+    'CREATE DATABASE %I ENCODING ''UTF8''',
+    current_setting('vars.TEST_DB_NAME')
+)
+WHERE NOT EXISTS (
+    SELECT FROM pg_database WHERE datname = current_setting('vars.TEST_DB_NAME')
+)
+\gexec
 
 -- Set database timezone
 DO $$

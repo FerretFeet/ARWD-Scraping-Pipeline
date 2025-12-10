@@ -5,7 +5,6 @@ import re
 from bs4 import BeautifulSoup
 
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
-from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.models.selector_template import SelectorTemplate
 from src.structures.directed_graph import Node
@@ -19,22 +18,22 @@ class BillVoteSelector(SelectorTemplate):
         super().__init__(
             selectors={
                 "title": (("div h1"), normalize_str),
-                "yea_voters": (_VoteListParsers.parse_yea_names, normalize_list_of_str_link),
-                "nay_voters": (_VoteListParsers.parse_nay_names, normalize_list_of_str_link),
+                "yea_voters": (_VoteListParsers.parse_yea_names, empty_transform),
+                "nay_voters": (_VoteListParsers.parse_nay_names, empty_transform),
                 "non_voting_voters": (
                     _VoteListParsers.parse_non_voting_names,
-                    normalize_list_of_str_link,
+                    empty_transform,
                 ),
                 "present_voters": (
                     _VoteListParsers.parse_present_names,
-                    normalize_list_of_str_link,
+                    empty_transform,
                 ),
                 "excused_voters": (
                     _VoteListParsers.parse_excused_names,
-                    normalize_list_of_str_link,
+                    empty_transform,
                 ),
                 "state": (
-                    lambda node, state_tree, parsed_data: self.get_dynamic_state(node, state_tree,
+                    lambda node, state_tree, parsed_data: self.get_dynamic_state_from_parents(node, state_tree,
                                             {"bill_id": None}, None),
                     empty_transform,
                 ),
@@ -115,8 +114,8 @@ class _VoteListParsers:
         result = []
         for a in vote_container.find_all("a"):
             rattr = a.get(attr)
-            text = a.get_text(strip=True)
-            result.append((text, rattr))
+            # text = a.get_text(strip=True)
+            result.append(rattr)
         return result
 
     @staticmethod

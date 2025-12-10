@@ -56,7 +56,7 @@ def db_engine():
 
     # 3. Drop test DB after session
     conn.close()
-    with psycopg.connect(f"dbname={os.environ['DB_NAME']} user={ADMIN_USER} password={ADMIN_PASS} host=127.0.0.1") as admin_conn:
+    with psycopg.connect(f"dbname={DB_NAME} user={ADMIN_USER} password={ADMIN_PASS} host=127.0.0.1") as admin_conn:
         admin_conn.autocommit = True
         with admin_conn.cursor() as cur:
             cur.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME}")

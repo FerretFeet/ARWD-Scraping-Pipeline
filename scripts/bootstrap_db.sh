@@ -9,7 +9,8 @@ ENV_FILE="$PROJECT_ROOT/.env"
 # Primary SQL file for creating DBs and Roles (runs on default 'postgres' DB)
 STRUCTURE_SQL="$PROJECT_ROOT/sql/bootstrap_db_and_users.sql"
 # Secondary SQL file for creating schemas and tables (runs on main application DB)
-SCHEMA_SQL="$PROJECT_ROOT/sql/create_schema_and_tables.sql"
+ENUMS_SQL="$PROJECT_ROOT/sql/ddl/enums.sql"
+TABLES_SQL="$PROJECT_ROOT/sql/ddl/tables.sql"
 UPDATE_HBA_SCRIPT="$PROJECT_ROOT/scripts/_update_pg_hba.sh"
 
 # ---------------------------
@@ -63,7 +64,8 @@ psql_exec "postgres" "$STRUCTURE_SQL"
 # 3b. Execute Schema/Table Creation (Runs on the new main DB)
 echo "=== 2/3: Creating schema, tables, and grants on $DB_NAME ==="
 # We pass the application DB name to the helper function
-psql_exec "$DB_NAME" "$SCHEMA_SQL"
+psql_exec "$DB_NAME" "$ENUMS_SQL"
+psql_exec "$DB_NAME" "$TABLES_SQL"
 
 # 3c. Update pg_hba.conf (Required for Password Authentication)
 echo "=== 3/3: Updating pg_hba.conf and reloading ==="
