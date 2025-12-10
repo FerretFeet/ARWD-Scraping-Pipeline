@@ -1,24 +1,24 @@
 
 CREATE TABLE IF NOT EXISTS sessions (
-    code VARCHAR(20) PRIMARY KEY NOT NULL,
+    session_code VARCHAR(20) PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     start_date DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS bills (
-    bill_id SERIAL PRIMARY KEY,
+    bill_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     bill_no VARCHAR(20) NOT NULL,
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     fk_session_code VARCHAR(20) NOT NULL,
     intro_date DATE NOT NULL,
     act_date DATE,
-    FOREIGN KEY (fk_session_code) REFERENCES sessions(code),
+    FOREIGN KEY (fk_session_code) REFERENCES sessions(session_code),
     UNIQUE(bill_no, fk_session_code)
 );
 
 CREATE TABLE IF NOT EXISTS bill_documents (
-    doc_id SERIAL PRIMARY KEY,
+    doc_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     fk_bill_id INT NOT NULL,
     document_type VARCHAR(40) NOT NULL,
     url TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS bill_documents (
 );
 
 CREATE TABLE IF NOT EXISTS legislators (
-    legislator_id SERIAL PRIMARY KEY,
+    legislator_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     phone VARCHAR(15),
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS legislators (
 );
 
 CREATE TABLE IF NOT EXISTS legislator_history (
-    history_id SERIAL PRIMARY KEY,
+    history_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     fk_legislator_id INT NOT NULL,
     district VARCHAR(10),
     seniority INT,
@@ -51,13 +51,13 @@ CREATE TABLE IF NOT EXISTS legislator_history (
 );
 
 CREATE TABLE IF NOT EXISTS committees (
-    committee_id SERIAL PRIMARY KEY,
+    committee_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS committee_membership (
-    committee_membership_id SERIAL PRIMARY KEY,
+    committee_membership_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     fk_committee_id INT NOT NULL,
     fk_legislator_id INT NOT NULL,
     membership_start DATE NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS committee_membership (
 );
 
 CREATE TABLE IF NOT EXISTS sponsors (
-    sponsor_id SERIAL PRIMARY KEY,
+    sponsor_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     sponsor_type sponsor_type NOT NULL,
     fk_legislator_id INT,
     fk_committee_id INT,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS sponsors (
 );
 
 CREATE TABLE IF NOT EXISTS vote_events (
-    vote_event_id SERIAL PRIMARY KEY,
+    vote_event_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     fk_bill_id INT NOT NULL,
     vote_timestamp TIMESTAMPTZ NOT NULL,
     chamber chamber NOT NULL,
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS vote_events (
 );
 
 CREATE TABLE IF NOT EXISTS legislator_votes (
-    vote_id SERIAL PRIMARY KEY,
+    vote_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     fk_vote_event_id INT NOT NULL,
     fk_legislator_id INT NOT NULL,
     vote_cast vote_type NOT NULL,

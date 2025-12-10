@@ -1,5 +1,6 @@
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, LiteralString
 
 import psycopg
 
@@ -12,10 +13,11 @@ class PipelineLoader:
     """
 
     def __init__(self, sql_file_path: Path, upsert_function_name: str,
-                 required_params: dict[str, type], *, strict: bool = False):
+                 required_params: dict[str, type], insert: LiteralString, *, strict: bool = False):
         self.sql_file_path: Path = sql_file_path
         self.upsert_function_name: str = upsert_function_name
         self.required_params: dict[str, type] = required_params
+        self.insert = insert
 
         self.strict = strict
         self._template = None
@@ -23,10 +25,20 @@ class PipelineLoader:
     def execute(self, params: dict, db_conn: psycopg.Connection) -> None | dict:
         self.validate_input(params)
         prefixed_params = {f"p_{key}": value for key, value in params.items()}
-        with db_conn.cursor() as cur:
-            cur.execute(self.sql_template, prefixed_params)
-            db_conn.commit()
-            return cur.fetchone()
+        for k, v in prefixed_params.items():
+            if isinstance(v, dict):
+                prefixed_params[k] = json.dumps(v)
+        sql = self.sql_template
+        if isinstance(db_conn, psycopg.Connection):
+            with db_conn.cursor() as cur:
+                cur.execute(self.insert, prefixed_params)
+                db_conn.commit()
+                return cur.fetchone()
+        elif isinstance(db_conn, psycopg.Cursor):
+            db_conn.execute(self.insert, prefixed_params)
+            return db_conn.fetchone()
+        return None
+
 
 
     def validate_input(self, input_params: dict[str, Any]) -> bool:

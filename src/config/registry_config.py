@@ -48,6 +48,22 @@ LOADER_CONFIG: dict = {
         },
         "name": "Upsert Legislator",
         "filepath": SQL_LOADER_BASE_PATH / "upsert_legislator.sql",
+        "insert": """
+            SELECT upsert_legislator(
+                %(p_first_name)s,
+                %(p_last_name)s,
+                %(p_url)s,
+                %(p_phone)s,
+                %(p_email)s,
+                %(p_address)s,
+                %(p_district)s,
+                %(p_seniority)s,
+                %(p_chamber)s::chamber,
+                %(p_party)s,
+                %(p_start_date)s,
+                %(p_committee_ids)s
+            );
+        """,
     },
     PipelineRegistryKeys.COMMITTEE: {
         "params": {
@@ -55,6 +71,10 @@ LOADER_CONFIG: dict = {
         },
         "name": "Upsert Committee",
         "filepath": SQL_LOADER_BASE_PATH / "upsert_committee.sql",
+        "insert": """SELECT upsert_bill_with_sponsors(%(p_title)s, %(p_bill_no)s, %(p_url)s,
+        %(p_session_code)s, %(p_intro_date)s, %(p_act_date)s,
+        %(p_bill_documents)s, %(p_lead_sponsor)s, %(p_other_primary_sponsor)s,
+        %(p_cosponsors)s);""",
     },
 }
 

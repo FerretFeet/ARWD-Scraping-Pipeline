@@ -47,11 +47,9 @@ UPDATE committee_membership
 SET membership_end = p_start_date - INTERVAL '1 day'
 WHERE fk_legislator_id = v_legislator_id
   AND membership_end IS NULL
-  AND (
-        p_committee_ids IS NULL
-        OR fk_committee_id <> ALL(p_committee_ids)
-      )
+  AND NOT (fk_committee_id = ANY(COALESCE(p_committee_ids, ARRAY[]::int[])))
   AND membership_start < p_start_date;
+
 -- Insert new memberships (safe even if array is NULL)
 FOREACH v_target_committee_id IN ARRAY COALESCE(p_committee_ids, ARRAY[]::integer[])
 LOOP

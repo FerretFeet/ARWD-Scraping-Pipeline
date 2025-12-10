@@ -6,20 +6,20 @@ from tests.unit_test.sql.conftest import SQL_DIR
 # SQL_DIR = project_root / "sql"
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def db(db_engine, sql_file):
     """
-    Runs each test inside a fresh transaction and rolls back.
+    Runs each test in a transaction and rolls back after the test.
     """
+    # Start a transaction
     db_engine.autocommit = False
-    cur = db_engine.cursor()
-    fp = SQL_DIR / sql_file
-    # Load the SQL file for the function
-    with open(fp) as f:
-        cur.execute(f.read())
+    with db_engine.cursor() as cur:
+        # Load the SQL file for the function
+        fp = SQL_DIR / sql_file
+        with open(fp) as f:
+            cur.execute(f.read())
 
-    yield cur
+        yield cur  # cursor available to test
 
-    # Roll back everything the test did
-    db_engine.rollback()
-    cur.close()
+        # Rollback everything after the test
+        db_engine.rollback()

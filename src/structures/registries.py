@@ -107,7 +107,7 @@ class ProcessorRegistry:
         """
         for key, stage_map in config.items():
             processor = PipelineLoader(stage_map["filepath"], stage_map["name"],
-                                       stage_map["params"])
+                                       stage_map["params"], stage_map["insert"])
             self.register(key, PipelineRegistries.LOAD)(processor)
             return
         raise ValueError(f"No config found for {PipelineRegistries.LOAD}")
