@@ -1,6 +1,9 @@
 from urllib.parse import urlparse
 
 
-def get_url_base_path(url: str) -> str:
+def get_url_base_path(url: str, *, include_path: bool = True) -> str:
     temp = urlparse(url)
-    return temp.netloc + temp.path
+    result = temp.scheme + "://" + temp.netloc
+    if include_path:
+        result += temp.path
+    return result

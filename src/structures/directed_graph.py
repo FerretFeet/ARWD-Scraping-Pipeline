@@ -119,12 +119,9 @@ class Node:
         if node_attrs:
             for key, value in node_attrs.items():
                 node_value = getattr(self, key, None)
-                print(f"testing match between {value} and {node_value}")
 
                 if value is not None and not self._compare(node_value, value):
                     return False
-        print("should visit complete#$########")
-        print(should_visit)
         return should_visit
 
 
@@ -321,7 +318,7 @@ class DirectionalGraph:
             self.roots.remove(root_node)
             self.propogate_downward_deletion(root_node)
             self.delete_node(root_node)
-            print(f"Successfully deleted entire graph subtree for domain: {domain_key}")
+            logger.info(f"Successfully deleted entire graph subtree for domain: {domain_key}")
             return True
 
         return False
@@ -377,8 +374,7 @@ class DirectionalGraph:
         return json.dumps(data, indent=4)
 
 
-    def from_JSON(self, json_str: str) -> None:  # noqa: N802
-        """Load IndexedTree from a JSON string."""
+    def from_JSON(self, json_str: str) -> None:
         data = json.loads(json_str)
         self.nodes.clear()
         self.name = data.get("name", "Directional Graph")
@@ -386,20 +382,20 @@ class DirectionalGraph:
         node_map = {}
         temp_links = []
 
+        nodes_data = data.get("nodes", [])  # <-- safe default
+
         # Pass 1: Create all Nodes (without links)
-        for node_data in data["nodes"]:
+        for node_data in nodes_data:
             new_node = Node(
                 node_type=node_data["node_type"],
                 url=node_data["url"],
                 data=node_data["data"],
                 state=node_data["state"],
                 override_id=node_data["id"],
-                # Don't pass incoming/outgoing here
             )
             self.nodes[new_node.url] = new_node
             node_map[new_node.id] = new_node
 
-            # Store links to process in Pass 2
             temp_links.append(
                 {
                     "node": new_node,
@@ -408,23 +404,19 @@ class DirectionalGraph:
                 },
             )
 
-        # Pass 2: Re-establish links using ID lookup
+        # Pass 2: Re-establish links
         for item in temp_links:
             current_node = item["node"]
-
             for out_id in item["out_ids"]:
                 if out_id in node_map:
                     current_node.add_outgoing(node_map[out_id])
-
             for in_id in item["in_ids"]:
                 if in_id in node_map:
                     current_node.add_incoming(node_map[in_id])
 
-        # Restore global counter
+        # Restore Node ID counter
         if self.nodes:
-            max_id = max(node.id for node in self.nodes.values())
-            Node.id_counter = max_id + 1
-
+            Node.id_counter = max(node.id for node in self.nodes.values()) + 1
 
     def save_file(self, filepath: Path) -> None:
         """Save tree to a file."""

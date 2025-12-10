@@ -31,7 +31,6 @@ class SelectorTemplate:
 
         This function can be customized to fetch values based on node type or state_key.
         """
-        print(f"in get dynamic state {node}, \n\nnode_attrs {node_attrs}")
         return state.find_in_graph(data_attrs, node_attrs)
 
     def get_dynamic_state_from_parents(self, node: directed_graph.Node,

@@ -10,9 +10,8 @@ class CommitteeSelector(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "title": ((
+                "name": ((
                     "h1",
-                    "href",
                 ), normalize_str),
             },
         )

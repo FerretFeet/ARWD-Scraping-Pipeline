@@ -7,9 +7,9 @@ def test_strip_session_from_link():
     # Test cases
     test_data = [
         ("/Legislators/Detail?member=S.+Flowers&ddBienniumSession=2025%2F2025R",
-         "2025%2F2025R"),
+         "2025/2025R"),
         ("/Legislators/Detail?member=Furman&ddBienniumSession=2025%2F2025R",
-         "2025%2F2025R"),
+         "2025/2025R"),
     ]
 
     for input_link, expected in test_data:

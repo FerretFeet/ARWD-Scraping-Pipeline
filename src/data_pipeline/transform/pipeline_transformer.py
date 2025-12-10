@@ -62,7 +62,6 @@ class PipelineTransformer:
             try:
                 # ... (rest of the try block remains the same) ...
                 transformed_val = transform_func(new_value, strict=strict)
-                print(f"TRANSFORMER DEBUG {key} VAL {transformed_val}")
                 if isinstance(transformed_val, dict):
                     transformed_content.update(transformed_val)
                 else:

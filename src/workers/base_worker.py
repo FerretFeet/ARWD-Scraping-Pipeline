@@ -25,7 +25,7 @@ class BaseWorker(threading.Thread):
     def run(self):
         while True:
             item = self.fetch_next()
-            print(f"{self.name.upper()}: Processing item: {item}")
+            logger.info(f"{self.name.upper()}: Processing item: {item}")
             if item is None:
                 if self.output_queue:
                     self.output_queue.put(item)
@@ -35,6 +35,7 @@ class BaseWorker(threading.Thread):
                 continue
             try:
                 self.process(item)
+                logger.info(f"[{self.name.upper()}]: Finished processing item: {item}")
             except Exception as e:
                 logger.warning(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {e}")
                 self.handle_error(item, e)
@@ -47,11 +48,9 @@ class BaseWorker(threading.Thread):
     def handle_error(self, item, error):
         # optional logging or state update
         self._set_state(item, PipelineStateEnum.ERROR)
-        print(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {error}")
-        print(f"Item state updated: {item.state}")
+        logger.warning(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {error}")
         logger.error(f"Uncaught processing error: {error}")
 
 
     def _set_state(self, node: directed_graph.Node, state: PipelineStateEnum) -> None:
-        print(f"_set_state: node id: {node.id}, state: {state}")
         node.set_state(state)

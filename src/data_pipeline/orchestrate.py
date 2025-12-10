@@ -19,6 +19,7 @@ from src.structures.directed_graph import DirectionalGraph
 from src.structures.indexed_tree import PipelineStateEnum
 from src.structures.registries import ProcessorRegistry, get_enum_by_url
 from src.utils.json_list import load_json_list
+from src.utils.logger import logger
 from src.utils.strings.get_url_base_path import get_url_base_path
 from src.workers.base_worker import BaseWorker
 
@@ -78,7 +79,7 @@ class Orchestrator:
         workers = self._setup_workers()
         self.start_workers(workers)
         queue_ordered_list = [self.queues[stage] for stage in PipelineRegistries]
-        print(f"FETCH QUEUE SIZE AFTER LOADING: {self.queues[PipelineRegistries.FETCH].qsize()}")  # <--- ADD THIS
+        logger.info(f"FETCH QUEUE SIZE AFTER LOADING: {self.queues[PipelineRegistries.FETCH].qsize()}")
 
         self.manage_workers(workers, queue_ordered_list)
         self.shutdown_workers(queue_ordered_list, workers)
@@ -94,13 +95,11 @@ class Orchestrator:
         for w in workers:
             w.join(timeout=5)
             if w.is_alive():
-                print(f"THREAD {w.name} FAILED SHUTDOWN")
+                logger.warning(f"THREAD {w.name} FAILED SHUTDOWN")
         time.sleep(0.005)
 
     def _next_seed(self, match_key: str) -> str:
         """Pop next seed url from seedurls list."""
-        print(f"SEED URLS: {self.seed_urls}")
-        print(f"SEED URL MATCH KEY = {match_key}")
         try:
             if not self.seed_urls[match_key]:
                 return None
@@ -126,31 +125,23 @@ class Orchestrator:
 
             for key in list(self.seed_urls.keys()):
                 domain_netloc = parse_url(key).netloc
-                print(f"Domain netloc: {domain_netloc}")
-                print(f"active netlocks: {active_root_netlocs}")
-                print(f"Start queue items: {start_queue.unfinished_tasks} {start_queue.queue} {start_queue}")
-                print("NODES")
-                print(node for node in self.state.nodes)
                 if domain_netloc not in active_root_netlocs:
                     next_url = self._next_seed(key)
-                    print(f"#################Next url: {next_url}")
                     if next_url:
                         self._enqueue_links(next_url, start_queue)
-            print(f"seed urls: {self.seed_urls}")
             # Yield control to workers to process scheduled items
             time.sleep(0.001)
 
             # PHASE 2: PIPELINE CLEARANCE (Block until all work is done)
         # The loop above is finished. All seeds have been scheduled.
 
-        print("SCHEDULER FINISHED. WAITING FOR PIPELINE CLEARANCE.")
 
         # This loop blocks the main thread until all items put into the queue
         # during Phase 1 have been processed by the workers (task_done() called).
         for queue in ordered_queues:
             queue.join()
 
-        print("PIPELINE CLEARED. PROCEEDING TO SHUTDOWN.")
+        logger.info("PIPELINE CLEARED. PROCEEDING TO SHUTDOWN.")
 
     def start_workers(self, worker_list: list[BaseWorker]) -> None:
         """Start workers."""
@@ -228,7 +219,7 @@ class Orchestrator:
             try:
                 # We expect a sentinel, so we just consume it.
                 q.get_nowait()
-                print(f"ORCHESTRATOR DRAINED SENTINEL from {q}")
+                logger.info(f"ORCHESTRATOR DRAINED SENTINEL from {q}")
                 q.task_done()
             except queue.Empty:
                 pass  # Already drained or empty, that's fine
@@ -241,36 +232,6 @@ class Orchestrator:
             self._enqueue_links(unvisited_nodes, root_queue)
 
 
-
-    #
-    # def _enqueue_links(self, enqueue_list: list[indexed_tree.Node] | str, queue: Queue) -> None:
-    #     """
-    #     Put enqueued values in queues.
-    #
-    #     Enqueue list can be a list of Nodes to be added directly to the queue in the order provided,
-    #         if enqueue list is None, enqueue next seed url.
-    #     """
-    #     if isinstance(enqueue_list, list) and isinstance(enqueue_list[0], indexed_tree.Node):
-    #         if enqueue_list:
-    #             for item in enqueue_list:
-    #                 item.state = PipelineStateEnum.AWAITING_FETCH
-    #                 queue.put(item)
-    #                 self.visited.append(item.url)
-    #                 continue
-    #     elif isinstance(enqueue_list, str):
-    #         print("CREATING NODE")
-    #         node = self.state[parse_url(enqueue_list).netloc].add_node(
-    #             node_type=get_enum_by_url(get_url_base_path(enqueue_list)),
-    #             parent=None,
-    #             url=enqueue_list,
-    #             state=PipelineStateEnum.AWAITING_FETCH,
-    #         )
-    #         queue.put(node)
-    #         self.visited.append(enqueue_list)
-    #
-    #     else:
-    #         msg = f"enqueue_list must be list of nodes or str, not {type(enqueue_list)}"
-    #         raise TypeError(msg)
 
     def _enqueue_links(self, enqueue_list: list[directed_graph.Node] | str, queue: Queue) -> None:
         """
@@ -285,9 +246,7 @@ class Orchestrator:
                     item.set_state(PipelineStateEnum.AWAITING_FETCH)
                     queue.put(item)
                     self.visited.append(item.url)
-                    print(item)
         elif isinstance(enqueue_list, str):
-            print("CREATING NODE")
             node = self.state.add_new_node(enqueue_list,
                 get_enum_by_url(get_url_base_path(enqueue_list)),
                 None,
@@ -295,7 +254,6 @@ class Orchestrator:
             )
             queue.put(node)
             self.visited.append(enqueue_list)
-            print(node)
         else:
             msg = f"enqueue_list must be list of nodes or str, not {type(enqueue_list)}"
             raise TypeError(msg)
@@ -319,20 +277,6 @@ class Orchestrator:
     def filter_seed_urls(self, seed_urls: list[str], known_urls: list[str]) -> list[str]:
         """Remove known urls from seed_urls."""
         return [url for url in seed_urls if url not in known_urls]
-
-    # def setup_states(self, seed_urls: dict[str, list[str]], cache_base_path: Path) -> list[indexed_tree.Node]:
-    #     nodes_to_stack = {}
-    #
-    #     for key, val in seed_urls.items():
-    #         v = val[0]
-    #         tree = self.state_cls(name=key)
-    #         self.state[key] = tree
-    #         if tree.load_from_file(cache_base_path / f"-{key}"):
-    #             nodes_to_stack[key] = self.state[key].reconstruct_order()
-    #             continue
-    #     interleaved_nodes = [item for items in zip_longest(*nodes_to_stack.values())
-    #                          for item in items if item is not None]
-    #     return interleaved_nodes
 
     def setup_states(self, seed_urls: dict[str, list[str]], cache_base_path: Path)\
             -> list[directed_graph.Node]:

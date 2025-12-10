@@ -214,10 +214,10 @@ class TestBillVoteSelector:
         combined = [
             v
             for v in (
-                (result.get("yea_voters") or [])
-                + (result.get("non_voting_voters") or [])
-                + (result.get("excused_voters") or [])
-                + (result.get("present_voters") or [])
+                (result.get("yea_voters").get("yea_voters") or [])
+                + (result.get("non_voting_voters").get("non_voting_voters") or [])
+                + (result.get("excused_voters").get("excused_voters") or [])
+                + (result.get("present_voters").get("present_voters") or [])
             )
             if v is not None
         ]

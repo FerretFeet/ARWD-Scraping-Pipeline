@@ -28,9 +28,9 @@ def fake_db_conn():
 def fake_loader_obj(fake_node):
     loader_obj = MagicMock(spec=LoaderObj)
     loader_obj.node = fake_node
-    loader_obj.name = "PAGE_ENUM"
-    loader_obj.params = {"data": "value"}
-    return loader_obj
+    fake_node.type = "PAGE_ENUM"
+    fake_node.data = {"data": "value"}
+    return fake_node
 
 
 @pytest.fixture
@@ -133,8 +133,24 @@ class TestCrawlerWorker:
     def test_enqueue_links(self, worker, fake_graph, fake_node, lifoqueues):
         fetch_q, _ = lifoqueues
         fake_graph.add_new_node.return_value = MagicMock(id="child")
-        worker._enqueue_links(fake_node, {"links": ["url1", "url2"]})
-        worker._enqueue_links(fake_node, {"links": ["url1", "url2"]})
+        worker._enqueue_links(
+            fake_node,
+            {
+                "links": [
+                    "https://arkleg.state.ar.us/Bills/Detail/123",
+                    "https://arkleg.state.ar.us/Bills/ViewBills",
+                ],
+            },
+        )
+        worker._enqueue_links(
+            fake_node,
+            {
+                "links": [
+                    "https://arkleg.state.ar.us/Bills/Detail/123",
+                    "https://arkleg.state.ar.us/Bills/ViewBills",
+                ],
+            },
+        )
 
 
 
@@ -148,7 +164,10 @@ class TestCrawlerWorker:
         domain = urlparse(fake_node.url).netloc
         worker.create_crawlers({fake_node})
         worker.crawlers[domain].get_page.return_value = "<html>"
-        worker.parser.get_content.return_value = {"links": ["A", "B"]}
+        worker.parser.get_content.return_value = {
+            "links": ["https://arkleg.state.ar.us/Bills/Detail/123",
+                      "https://arkleg.state.ar.us/Bills/ViewBills"],
+        }
         worker.fun_registry.get_processor.side_effect = [
             {"fetch_template": True},  # FETCH
             {"process_template": True},  # PROCESS next step
@@ -269,10 +288,9 @@ class TestProcessorWorker:
         processor_worker.process(fake_node)
 
         assert fake_node.state == PipelineStateEnum.AWAITING_LOAD
-        assert isinstance(fake_node.data, LoaderObj)
-        loader_obj = fake_node.data
-        assert loader_obj.params["transformed_key"] == "transformed_value"
-        assert processor_worker.output_queue.get_nowait() == loader_obj
+        # loader_obj = fake_node.data
+        assert fake_node.data["transformed_key"] == "transformed_value"
+        assert processor_worker.output_queue.get_nowait() == fake_node
 
     def test_process_raises_on_invalid_loader(self, processor_worker, fake_node):
         """
@@ -355,11 +373,11 @@ class TestLoaderWorker:
     def test_process_success(self, loader_worker, fake_loader_obj, fake_db_conn, fake_graph):
         loader_worker.process(fake_loader_obj)
 
-        assert fake_loader_obj.node.state == PipelineStateEnum.COMPLETED
-        assert fake_loader_obj.node.data == {"db_result": "ok"}
+        assert fake_loader_obj.state == PipelineStateEnum.COMPLETED
+        assert fake_loader_obj.data == {"db_result": "ok"}
         fake_db_conn.commit.assert_called_once()
         fake_db_conn.rollback.assert_not_called()
-        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node.url)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.url)
 
     def test_process_load_returns_none(self, loader_worker, fake_loader_obj, fake_db_conn):
         fake_loader = MagicMock()
@@ -369,8 +387,8 @@ class TestLoaderWorker:
 
         loader_worker.process(fake_loader_obj)
 
-        assert fake_loader_obj.node.data is None
-        assert fake_loader_obj.node.state == PipelineStateEnum.COMPLETED
+        assert fake_loader_obj.data is None
+        assert fake_loader_obj.state == PipelineStateEnum.COMPLETED
         fake_db_conn.commit.assert_called_once()
 
     def test_process_raises_exception(self, loader_worker, fake_loader_obj, fake_db_conn):
@@ -391,17 +409,17 @@ class TestLoaderWorker:
     def test_remove_if_children_not_completed(self, loader_worker, fake_loader_obj, fake_graph):
         child_node = MagicMock()
         child_node.state = PipelineStateEnum.PROCESSING
-        fake_loader_obj.node.children.append("child_id")
+        fake_loader_obj.children.append("child_id")
         fake_graph.find_node.return_value = child_node
 
-        loader_worker._remove_nodes(fake_loader_obj.node)
+        loader_worker._remove_nodes(fake_loader_obj)
         fake_graph.safe_remove_node.assert_not_called()
 
     def test_remove_if_children_completed(self, loader_worker, fake_loader_obj, fake_graph):
         child_node = MagicMock()
         child_node.state = PipelineStateEnum.COMPLETED
-        fake_loader_obj.node.children.append("child_id")
+        fake_loader_obj.children.append("child_id")
         fake_graph.find_node.return_value = child_node
 
-        loader_worker._remove_nodes(fake_loader_obj.node)
-        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node.url)
+        loader_worker._remove_nodes(fake_loader_obj)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.url)

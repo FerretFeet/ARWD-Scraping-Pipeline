@@ -5,9 +5,9 @@ from queue import LifoQueue, Queue
 class PipelineRegistryKeys(Enum):
     """Enum defining pipeline registry keys, valid, expected pages."""
 
-    COMMITTEES_CAT = "https://arkleg.state.ar.us/Committees"
-    COMMITTEES_LIST = "https://arkleg.state.ar.us/Committees/List"
-    COMMITTEE = "https://arkleg.state.ar.us/Committees/Detail"
+    COMMITTEES_CAT = "arkleg.state.ar.us/Committees"
+    COMMITTEES_LIST = "arkleg.state.ar.us/Committees/List"
+    COMMITTEE = "arkleg.state.ar.us/Committees/Detail"
     ARK_LEG_SEEDER = "arkleg.state.ar.us/"
     LEGISLATOR_LIST = "arkleg.state.ar.us/Legislators/List"
     LEGISLATOR = "arkleg.state.ar.us/Legislators/Detail"

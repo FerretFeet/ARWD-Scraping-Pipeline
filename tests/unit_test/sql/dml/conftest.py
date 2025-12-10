@@ -1,7 +1,7 @@
 
 import pytest
 
-from tests.unit_test.sql.conftest import SQL_DIR
+from tests.conftest import SQL_DIR
 
 # SQL_DIR = project_root / "sql"
 

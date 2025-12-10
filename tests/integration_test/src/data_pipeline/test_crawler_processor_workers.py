@@ -265,4 +265,3 @@
 #         assert bill_1_obj.params["title"] == "AN ACT TO TEST HB1001", "Transformation to uppercase failed."
 #         assert bill_2_obj.params["title"] == "AN ACT TO TEST HB1002", "Transformation to uppercase failed."
 #
-#         print("✅ Integration test passed successfully!")

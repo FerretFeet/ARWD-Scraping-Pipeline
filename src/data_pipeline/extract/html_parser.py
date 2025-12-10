@@ -60,8 +60,6 @@ class HTMLParser:
         - key: (selector, attr, label) -> For simple, declarative scraping
         - key: callable_function(soup)      -> For complex, imperative scraping
         """
-        logger.info("Html parser start")
-
         if not isinstance(template, dict) or not isinstance(html_text, str):
             message = (
                 f"Parameter passed of incorrect type:\n"

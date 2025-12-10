@@ -16,7 +16,6 @@ def get_enum_by_url(url: str) -> PipelineRegistryKeys:
     # Sort the keys by length (longest value first) to ensure specific pages
     # (like 'Bills/Detail') match before generic ones (like 'Bills').
     sorted_keys = sorted(PipelineRegistryKeys, key=lambda k: len(k.value), reverse=True)
-
     for key in sorted_keys:
         # Check if the enum's value is contained within the cleaned input URL.
         # Example: 'https://arkleg.state.ar.us/Bills/Detail' is in 'https://arkleg.state.ar.us/Bills/Detail'
@@ -102,13 +101,24 @@ class ProcessorRegistry:
 
     def load_l_config(self, config: dict):
         """
-        Load a config mapping:
+        Load a config mapping:.
+
             {PipelineRegistryKey: {Stage: Processor}}
         """
         for key, stage_map in config.items():
-            processor = PipelineLoader(stage_map["filepath"], stage_map["name"],
-                                       stage_map["params"], stage_map["insert"])
-            self.register(key, PipelineRegistries.LOAD)(processor)
-            return
-        raise ValueError(f"No config found for {PipelineRegistries.LOAD}")
+            # Wrap the PipelineLoader class with its initialization parameters
+            class Loader(PipelineLoader):
+                def __init__(self):
+                    super().__init__(
+                        stage_map["filepath"],
+                        stage_map["name"],
+                        stage_map["params"],
+                        stage_map["insert"],
+                    )
+
+            # Register the class, not an instance
+            self.register(key, PipelineRegistries.LOAD)(Loader)
+        if not config:
+            msg = f"No config found for {PipelineRegistries.LOAD}"
+            raise ValueError(msg)
 

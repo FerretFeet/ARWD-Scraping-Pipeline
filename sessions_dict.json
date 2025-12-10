@@ -1,0 +1,150 @@
+{
+  "2025/2025R": {
+    "label": "2025 - Regular Session, 2025",
+    "year": "2025-01-01"
+  },
+  "2023/2024S2": {
+    "label": "2023 - Second Extraordinary Session, 2024",
+    "year": "2024-02-01"
+  },
+  "2023/2024F": {
+    "label": "2023 - Fiscal Session, 2024",
+    "year": "2024-01-01"
+  },
+  "2023/2023S1": {
+    "label": "2023 - First Extraordinary Session, 2023",
+    "year": "2023-02-01"
+  },
+  "2023/2023R": {
+    "label": "2023 - Regular Session, 2023",
+    "year": "2023-01-01"
+  },
+  "2021/2022S3": {
+    "label": "2021 - Third Extraordinary Session, 2022",
+    "year": "2022-02-01"
+  },
+  "2021/2022F": {
+    "label": "2021 - Fiscal Session, 2022",
+    "year": "2022-01-01"
+  },
+  "2021/2021S2": {
+    "label": "2021 - Second Extraordinary Session, 2021",
+    "year": "2021-03-01"
+  },
+  "2021/2021S1": {
+    "label": "2021 - First Extraordinary Session, 2021",
+    "year": "2021-02-01"
+  },
+  "2021/2021R": {
+    "label": "2021 - Regular Session, 2021",
+    "year": "2021-01-01"
+  },
+  "2019/2020S1": {
+    "label": "2019 - First Extraordinary Session, 2020",
+    "year": "2020-02-01"
+  },
+  "2019/2020F": {
+    "label": "2019 - Fiscal Session, 2020",
+    "year": "2020-01-01"
+  },
+  "2019/2019R": {
+    "label": "2019 - Regular Session, 2019",
+    "year": "2019-01-01"
+  },
+  "2017/2018S2": {
+    "label": "2017 - Second Extraordinary Session, 2018",
+    "year": "2018-01-01"
+  },
+  "2017/2018F": {
+    "label": "2017 - Fiscal Session, 2018",
+    "year": "2018-02-01"
+  },
+  "2017/2017S1": {
+    "label": "2017 - First Extraordinary Session, 2017",
+    "year": "2017-01-01"
+  },
+  "2017/2017R": {
+    "label": "2017 - Regular Session, 2017",
+    "year": "2017-01-01"
+  },
+  "2015/2016S3": {
+    "label": "2015 - Third Extraordinary Session, 2016",
+    "year": "2016-03-01"
+  },
+  "2015/2016S2": {
+    "label": "2015 - Second Extraordinary Session, 2016",
+    "year": "2016-02-01"
+  },
+  "2015/2016F": {
+    "label": "2015 - Fiscal Session, 2016",
+    "year": "2016-01-01"
+  },
+  "2015/2015S1": {
+    "label": "2015 - First Extraordinary Session, 2015",
+    "year": "2015-02-01"
+  },
+  "2015/2015R": {
+    "label": "2015 - Regular Session, 2015",
+    "year": "2015-01-01"
+  },
+  "2013/2014S2": {
+    "label": "2013 - Second Extraordinary Session, 2014",
+    "year": "2014-02-01"
+  },
+  "2013/2014F": {
+    "label": "2013 - Fiscal Session, 2014",
+    "year": "2014-01-01"
+  },
+  "2013/2013S1": {
+    "label": "2013 - First Extraordinary Session, 2013",
+    "year": "2013-02-01"
+  },
+  "2013/2013R": {
+    "label": "2013 - Regular Session, 2013",
+    "year": "2013-01-01"
+  },
+  "2011/2012F": {
+    "label": "2011 - Fiscal Session, 2012",
+    "year": "2012-01-01"
+  },
+  "2011/2011R": {
+    "label": "2011 - Regular Session, 2011",
+    "year": "2011-01-01"
+  },
+  "2009/2010F": {
+    "label": "2009 - Fiscal Session, 2010",
+    "year": "2010-01-01"
+  },
+  "2009/R": {
+    "label": "2009 - Regular Session, 2009",
+    "year": "2009-01-01"
+  },
+  "2007/S1": {
+    "label": "2007 - First Extraordinary Session, 2008",
+    "year": "2008-01-01"
+  },
+  "2007/R": {
+    "label": "2007 - Regular Session, 2007",
+    "year": "2007-01-01"
+  },
+  "2005/S1": {
+    "label": "2005 - First Extraordinary Session, 2006",
+    "year": "2006-01-01"
+  },
+  "2005/R": {
+    "label": "2005 - Regular Session, 2005",
+    "year": "2005-01-01"
+  },
+  "2003/S2": {
+    "label": "2003 - Second Extraordinary Session, 2003",
+    "year": "2003-03-01"
+  },
+  "2003/S1": {
+    "label": "2003 - First Extraordinary Session, 2003",
+    "year": "2003-02-01"
+  },
+  "2003/R": {
+    "label": "2003 - Regular Session, 2003",
+    "year": "2003-01-01"
+  }
+}

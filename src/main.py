@@ -10,9 +10,30 @@
 # from src.utils.json_list import append_to_json_list, load_json_list
 # from src.workers.pipeline_workers import CrawlerWorker, LoaderWorker, ProcessorWorker
 #
-# STRICT = False
-#
-# db_conn = ""
+from src.bootstrap_sessions import insert_sessions, sessions_data, sql_function
+from src.config.settings import PIPELINE_REGISTRY
+from src.data_pipeline.orchestrate import Orchestrator
+from src.services.db_connect import db_conn
+from src.structures.directed_graph import DirectionalGraph
+
+STRICT = False
+arklegbase = "https://arkleg.state.ar.us/"
+arklegsesquery = "?ddBienniumSession="
+def main():
+    state = DirectionalGraph()
+    with db_conn() as conn:
+        session_codes = insert_sessions(conn, sessions_data, sql_function)
+        registry = PIPELINE_REGISTRY
+        starting_links = [arklegbase + arklegsesquery + sc[0] for sc in session_codes]
+        print(starting_links)
+        orchestrator = Orchestrator(
+            registry,
+            starting_links,
+            conn,
+            state=state,
+        )
+        orchestrator.orchestrate()
+
 # def main(starting_url: str) -> None:
 #     """Run the main function."""
 #     # ----- Set up vars
@@ -105,5 +126,5 @@
 #     loader_worker.join()
 #
 #
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()

@@ -2,6 +2,8 @@ import re
 
 from bs4 import BeautifulSoup
 
+from src.data_pipeline.transform.utils.normalize_str import normalize_str
+
 # Assuming these imports are already part of the code
 from src.models.selector_template import SelectorTemplate
 from src.structures.registries import (
@@ -19,26 +21,28 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "legislator_list": ("div.container ul li div.container a:first-child", "href"),
                 "bill_section": self.parse_bill_section,
+                "legislator_list": self.parse_legislator_list,
+                "committees_cat": self.parse_committee_cats,
             },
         )
 
     @staticmethod
-    def parse_section(soup: BeautifulSoup, matchstr: str) -> list[str] | None:
+    def parse_legislator_list(soup: BeautifulSoup) -> list[str] | None:
+        """Select legislators list."""
+        a = soup.find("a", attrs={"id": "dropdownMenuLegislators"})
+        new_a = a.find_next("a")
+        return new_a.get("href")
+    @staticmethod
+    def parse_committee_cats(soup: BeautifulSoup) -> list[str] | None:
         """Select bills section links."""
-        for a in soup.select("li a:first-child"):
-            if a.get_text(strip=True).lower() == "bill":
-                return a.get("href")
-        return None
+        a = soup.find("a", attrs={"id": "dropdownMenuCommittees"})
+        return a.get("href")
     @staticmethod
     def parse_bill_section(soup: BeautifulSoup) -> list[str] | None:
         """Select bills section links."""
-        return ArkLegSeederLinkSelector.parse_section(soup, "bill")
-    @staticmethod
-    def parse_committee_section(soup: BeautifulSoup) -> list[str] | None:
-        """Select bills section links."""
-        return ArkLegSeederLinkSelector.parse_section(soup, "committees")
+        a = soup.find("a", attrs={"id": "dropdownMenuBills"})
+        return a.get("href")
 
 
 
@@ -118,15 +122,19 @@ class CommitteeCategories(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "committee_categories": ("", "href"),
+                "committee_categories": self.parse_committee_categories,
             },
         )
     @staticmethod
     def parse_committee_categories(soup: BeautifulSoup) -> list[str] | None:
+        """Select committee category links."""
+        valid_categories = ["joint", "senate", "house", "task force"]
+        result = []
+        a = soup.select("div#content div.container a")
         for a in soup.select("div#content div.container a"):
-            if a.get_text(strip=True).lower() in ["joint", "senate", "house", "task force"]:
-                return a.get("href")
-        return None
+            if normalize_str(a.get_text(strip=True)) in valid_categories:
+                result.append(a.get("href"))
+        return result
 
 
 class CommitteeListLinkSelector(SelectorTemplate):
@@ -143,3 +151,5 @@ class CommitteeListLinkSelector(SelectorTemplate):
                 "next_page": ("div#content div.container > p a", "href"),
             },
         )
+#############33
+###### NEEDE TO CREATE NODES FOR COMMITTEES AND ASSOCIATE THEM WITH DB IDS

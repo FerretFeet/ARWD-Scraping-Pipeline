@@ -118,20 +118,16 @@ class _BillParsers:
     @staticmethod
     def parse_other_bill_documents(soup: BeautifulSoup) -> dict[str, dict[str, list[str]]] | None:
         bill_documents = soup.find_all("a", attrs={"aria-label": "Download PDF"})
-        print(f"DEBUG BILL DOCS {bill_documents}")
         if not bill_documents: return None
         result = {}
         for doc in bill_documents:
             label = doc.find_previous("h3")
-            print("\nlabel\n")
-            print(label)
             label = label.get_text()
 
             if label not in result:
                 result[label] = [html.unescape(doc.get("href"))]
             else:
                 result[label].append(html.unescape(doc.get("href")))
-        print(f"result is {result}")
         result.update({"bill_text": _BillParsers.parse_bill_no_dwnld(soup)})
         result.update({"act_text": _BillParsers.parse_act_no_dwnld(soup)})
         return result

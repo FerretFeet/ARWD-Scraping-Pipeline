@@ -50,7 +50,6 @@ class BillVoteSelector(SelectorTemplate):
 
     def state_vote_lookup(self, node: Node, state_tree, parsed_data, pdkey):
         urls = parsed_data.get(pdkey)
-        print(f"DEBUG STATE VOTE LOOKUP {urls}")
         if not urls:
             return {pdkey: {}}
 
@@ -64,13 +63,11 @@ class BillVoteSelector(SelectorTemplate):
                 {rkey: None},
                 {"url": html.unescape(url)},
             )
-            print(f"STATE VOTE FOUND NODE {found_node}")
             if found_node:
                 returnlist.append(found_node.data[rkey])
             else:
                 return None
-        print(f"STATE VOTE FOUND NODES {len(returnlist)}")
-        return {pdkey: returnlist}
+        return {pdkey: {pdkey: returnlist}}
 
     def yea_lookup(self, node, state_tree, parsed_data):
         return self.state_vote_lookup(node, state_tree, parsed_data, "yea_voters")

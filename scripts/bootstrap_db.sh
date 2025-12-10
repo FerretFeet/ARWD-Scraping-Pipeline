@@ -6,9 +6,7 @@ set -euo pipefail
 # ---------------------------
 PROJECT_ROOT=$(dirname "$(realpath "$0")")/..
 ENV_FILE="$PROJECT_ROOT/.env"
-# Primary SQL file for creating DBs and Roles (runs on default 'postgres' DB)
 STRUCTURE_SQL="$PROJECT_ROOT/sql/bootstrap_db_and_users.sql"
-# Secondary SQL file for creating schemas and tables (runs on main application DB)
 ENUMS_SQL="$PROJECT_ROOT/sql/ddl/enums.sql"
 TABLES_SQL="$PROJECT_ROOT/sql/ddl/tables.sql"
 UPDATE_HBA_SCRIPT="$PROJECT_ROOT/scripts/_update_pg_hba.sh"
@@ -33,13 +31,23 @@ set -a
 source "$ENV_FILE"
 set +a
 
-# Helper function to run psql, passing all ENV vars as psql variables (-v)
+# ---------------------------
+# Helper function to run SQL via psql
+# ---------------------------
 psql_exec() {
-    local db_name="${1:-postgres}" # Default to 'postgres'
+    local db_name="${1:-postgres}"
     local sql_file="$2"
-    echo "  -> Executing $sql_file against database: $db_name"
+    local db_user="${3:-postgres}"
+    local db_pass="${4:-}"
 
-    sudo -u postgres psql -v ON_ERROR_STOP=1 \
+    echo "  -> Executing $sql_file against database: $db_name as user: $db_user"
+
+    if [[ -n "$db_pass" ]]; then
+        export PGPASSWORD="$db_pass"
+    fi
+
+    # Run SQL with search_path set and pass all variables for SQL substitution
+    sudo -u "$db_user" psql -v ON_ERROR_STOP=1 \
         -v DB_NAME="$DB_NAME" \
         -v TEST_DB_NAME="$TEST_DB_NAME" \
         -v ADMIN_USER="$ADMIN_USER" \
@@ -49,8 +57,14 @@ psql_exec() {
         -v TEST_DB_USER="$TEST_DB_USER" \
         -v TEST_DB_PASS="$TEST_DB_PASS" \
         -v SCRAPER_SCHEMA="$SCRAPER_SCHEMA" \
-        -d "$db_name" \
-        -f "$sql_file"
+        -d "$db_name" <<-EOSQL
+            SET search_path TO $SCRAPER_SCHEMA;
+            \i $sql_file
+EOSQL
+
+    if [[ -n "$db_pass" ]]; then
+        unset PGPASSWORD
+    fi
 }
 
 # ---------------------------
@@ -61,13 +75,12 @@ psql_exec() {
 echo "=== 1/3: Creating databases and roles ==="
 psql_exec "postgres" "$STRUCTURE_SQL"
 
-# 3b. Execute Schema/Table Creation (Runs on the new main DB)
+# 3b. Execute Schema/Table Creation (Runs on main application DB)
 echo "=== 2/3: Creating schema, tables, and grants on $DB_NAME ==="
-# We pass the application DB name to the helper function
-psql_exec "$DB_NAME" "$ENUMS_SQL"
-psql_exec "$DB_NAME" "$TABLES_SQL"
+psql_exec "$DB_NAME" "$ENUMS_SQL" "$SCRAPER_USER" "$SCRAPER_PASS"
+psql_exec "$DB_NAME" "$TABLES_SQL" "$SCRAPER_USER" "$SCRAPER_PASS"
 
-# 3c. Update pg_hba.conf (Required for Password Authentication)
+# 3c. Update pg_hba.conf
 echo "=== 3/3: Updating pg_hba.conf and reloading ==="
 if [[ ! -x "$UPDATE_HBA_SCRIPT" ]]; then
     echo "Error: pg_hba update script not found or is not executable: $UPDATE_HBA_SCRIPT"
