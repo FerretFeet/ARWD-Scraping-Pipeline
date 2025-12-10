@@ -13,32 +13,16 @@ class PipelineTransformer:
         """Initialize the transformer with strict flag."""
         self.strict: bool = config["strict"] if strict is None else strict
 
-    def transform_content(  # noqa: C901, PLR0912
-        self,
-        template: dict,
-        content: dict,
-        *,
-        strict: bool = False,
-    ) -> dict:
-        """
-        Pipeline function for transforming content.
-
-        Args:
-            template (dict): template holding transform functions for each possible expected
-                content.key
-            content (dict): content to be transformed
-            strict: whether to raise recoverable errors or not
-
-        Returns:
-            dict: transformed content
-
-        """
-        print("transform content func")
+    def transform_content(self, template: dict, content: dict, *, strict: bool = False) -> dict:
+        self.strict = strict # Assuming 'self.strict' is used elsewhere
         transformed_content = {}
         failed_keys = []
+
+        # ... (other setup code) ...
+
         for key, value in content.items():
-            print(f"key {key}")
-            print(f"value {value}")
+            # ... (key and None checks) ...
+
             if key not in template:
                 msg = f"Key {key} not in template"
                 logger.error(msg)
@@ -46,29 +30,39 @@ class PipelineTransformer:
                 if self.strict:
                     raise KeyError(msg)
                 continue
+
             if value is None:
                 transformed_content[key] = value
                 continue
-            if isinstance(value, list):
-                new_value = (
-                    [html.unescape(str(v)) for v in value] if not isinstance(value, list) else value
+
+            # 💡 FIX START: Correctly handle unescaping for collections and scalars
+
+            if isinstance(value, (list, set)):
+                # If it's a list or set, iterate and unescape each item that is string-like
+                new_value = type(value)(
+                    html.unescape(str(v)) if isinstance(v, (str, bytes)) else v
+                    for v in value
                 )
+            elif isinstance(value, str):
+                # If it's a scalar value, convert to string and unescape
+                new_value = html.unescape(value)
             else:
-                new_value = html.unescape(str(value))
+                new_value = value
+
+            # 💡 FIX END
 
             transform_func = template[key]
 
             if not callable(transform_func):
                 msg = f"Value {transform_func} is not callable for key {key}"
-
                 logger.warning(msg)
                 failed_keys.append(key)
                 raise TypeError(msg)
 
             try:
-
+                # ... (rest of the try block remains the same) ...
                 transformed_val = transform_func(new_value, strict=strict)
-
+                print(f"TRANSFORMER DEBUG {key} VAL {transformed_val}")
                 if isinstance(transformed_val, dict):
                     transformed_content.update(transformed_val)
                 else:
@@ -79,12 +73,12 @@ class PipelineTransformer:
                 if self.strict:
                     raise
                 continue
-
             except Exception as e:
                 logger.error(f"Error occurred while transforming {key}: {e}")
                 failed_keys.append(key)
                 raise
 
+        # ... (final logging and return) ...
         if failed_keys:
             logger.error(
                 f"Keys {failed_keys} encountered error while transforming {content} "

@@ -26,7 +26,6 @@ class BillSelector(SelectorTemplate):
                         normalize_str(bill_no, strict=strict, remove_substr="PDF")
                     ),
                 ),
-                "bill_no_dwnld": (_BillParsers.parse_bill_no_dwnld, empty_transform),
                 "act_no": (
                     _BillParsers.parse_act_no,
                     lambda bill_no, *, strict: (
@@ -43,7 +42,8 @@ class BillSelector(SelectorTemplate):
                 "cosponsors": (_BillParsers.parse_cosponsors, empty_transform),
                 "intro_date": (_BillParsers.parse_intro_date, transform_str_to_date),
                 "act_date": (_BillParsers.parse_act_date, transform_str_to_date),
-                "vote_links": (_BillParsers.parse_vote_links, empty_transform),
+                "bill_documents": (_BillParsers.parse_other_bill_documents,
+                                   _BillTransformers.transform_bill_documents),
                 "state_primary_sponsor": (
                     self.primary_sponsor_lookup,
                     empty_transform,
@@ -95,7 +95,46 @@ class BillSelector(SelectorTemplate):
         return self.state_sponsor_lookup(node, state_tree, parsed_data, "other_primary_sponsor")
 
 
+class _BillTransformers:
+    @staticmethod
+    def transform_bill_documents(dinput: dict, *, strict: bool = False):
+        returndict = {}
+        for key, val in dinput.items():
+            nkey = key.lower()
+            nval = [normalize_str(v) for v in val]
+            returndict.update({nkey: nval})
+        return {"bill_documents": returndict}
+    @staticmethod
+    def normalize_bill_doc_type(billdoc: str) -> str:
+        if billdoc == "amendments":
+            return "amendment"
+        if "fiscal impact" in billdoc:
+            return "fiscal_impact"
+        return billdoc
+
+
 class _BillParsers:
+    @staticmethod
+    def parse_other_bill_documents(soup: BeautifulSoup) -> dict[str, dict[str, list[str]]] | None:
+        bill_documents = soup.find_all("a", attrs={"aria-label": "Download PDF"})
+        print(f"DEBUG BILL DOCS {bill_documents}")
+        if not bill_documents: return None
+        result = {}
+        for doc in bill_documents:
+            label = doc.find_previous("h3")
+            print("\nlabel\n")
+            print(label)
+            label = label.get_text()
+
+            if label not in result:
+                result[label] = [html.unescape(doc.get("href"))]
+            else:
+                result[label].append(html.unescape(doc.get("href")))
+        print(f"result is {result}")
+        result.update({"bill_text": _BillParsers.parse_bill_no_dwnld(soup)})
+        result.update({"act_text": _BillParsers.parse_act_no_dwnld(soup)})
+        return result
+
     @staticmethod
     def parse_vote_links(soup: BeautifulSoup) -> list[str] | None:
         vote_links = soup.find_all("a", string=re.compile(r"vote", re.IGNORECASE))  # type: ignore  # noqa: PGH003
@@ -167,9 +206,9 @@ class _BillParsers:
         return result[2]
 
     @staticmethod
-    def parse_bill_no_dwnld(soup: BeautifulSoup) -> str | None:
+    def parse_bill_no_dwnld(soup: BeautifulSoup) -> list[str] | None:
         label = "Bill Number"
-        return _BillParsers._parse_bill_detail_table(soup, label, "href", nested_tag="a")
+        return [_BillParsers._parse_bill_detail_table(soup, label, "href", nested_tag="a")]
 
     @staticmethod
     def parse_act_no(soup: BeautifulSoup) -> str | None:
@@ -178,9 +217,9 @@ class _BillParsers:
         return result[2]
 
     @staticmethod
-    def parse_act_no_dwnld(soup: BeautifulSoup) -> str | None:
+    def parse_act_no_dwnld(soup: BeautifulSoup) -> list[str] | None:
         label = "Act Number"
-        return _BillParsers._parse_bill_detail_table(soup, label, "href", nested_tag="a")
+        return [_BillParsers._parse_bill_detail_table(soup, label, "href", nested_tag="a")]
 
     @staticmethod
     def parse_orig_chamber(soup: BeautifulSoup) -> str | None:

@@ -10,6 +10,7 @@ from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
 from src.data_pipeline.extract.html_parser import HTMLParser
 from src.data_pipeline.extract.webcrawler import Crawler
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
+from src.data_pipeline.transform.utils.strip_session_from_string import strip_session_from_link
 from src.data_pipeline.utils.fetch_scheduler import FetchScheduler
 from src.structures import directed_graph
 from src.structures.directed_graph import DirectionalGraph
@@ -87,7 +88,7 @@ class CrawlerWorker(BaseWorker):
                 self.output_queue.put(working_node)
                 print("Finished preparing for next step")
             else: # No next step, dont send to queue
-                self._set_state(working_node, PipelineStateEnum.COMPLETED)
+                self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
                 print("No next step, finished.")
             if final_flag:
                 break
@@ -188,12 +189,14 @@ class ProcessorWorker(BaseWorker):
 
     def process(self, node: directed_graph.Node) -> None:
         self._set_state(node, PipelineStateEnum.PROCESSING)
-        t_parser, t_transformer, state_pairs = self._get_processing_templates(node.url)
+        t_parser, t_transformer, state_pairs = self._get_processing_templates(node.url, node)
         if not t_parser or not t_transformer:
             msg = f"Expected parser and transformer templates for node {node} in processor worker"
             raise Exception(msg)  # noqa: TRY002
         parsed_data = self._parse_html(node.url, node.data["html"], t_parser)
         # --- Attach state values after parse, parser not able to handle
+        parsed_data, t_transformer = self.inject_session_code(parsed_data, t_transformer, node)
+        print(f"debug in processor worker: {parsed_data}\n\n{t_transformer}")
         transformed_data = self._transform_data(parsed_data, t_transformer)
         temptemplates = self._attach_state_values(node, transformed_data, t_transformer, state_pairs)
         if temptemplates is None:
@@ -244,6 +247,7 @@ class ProcessorWorker(BaseWorker):
             state_dict = state_pairs[key][0](node, self.state, parsed_data)
             if not state_dict:
                 #Wait for node data to be loaded
+                node.set_state(PipelineStateEnum.AWAITING_PROCESSING)
                 self.input_queue.put(node)
                 return None
             print(f"DEBUG RETURN STATE DICT {state_dict}")
@@ -252,7 +256,16 @@ class ProcessorWorker(BaseWorker):
             t_transformer.update(state_dict)
         return parsed_data
 
-    def _get_processing_templates(self, url_or_templates: str | dict):
+    def inject_session_code(self, parse_data: dict, trans_template: dict,
+                            node: directed_graph.Node) -> tuple:
+        parse_data.update({"session_code": node.url})
+        trans_template.update({"session_code": strip_session_from_link})
+        print(f"parsed data is {parse_data}")
+        print(f"trans_template is {trans_template}")
+        return parse_data, trans_template
+
+
+    def _get_processing_templates(self, url_or_templates: str | dict, node: directed_graph.Node):
         if isinstance(url_or_templates, str):
             parsed_url = get_url_base_path(url_or_templates)
             parser_enum = get_enum_by_url(parsed_url)
@@ -270,7 +283,6 @@ class ProcessorWorker(BaseWorker):
         # Separate selectors and transformers from parsing templates
         selector_template = {key: val[0] for key, val in parsing_templates.items()}
         transformer_template = {key: val[1] for key, val in parsing_templates.items()}
-
 
         return selector_template, transformer_template, state_key_pairs
 
@@ -321,10 +333,9 @@ class LoaderWorker(BaseWorker):
 
     def _remove_nodes(self, node: directed_graph.Node):
         print("remove nodes called")
-        self.state.safe_remove_root(node)
+        self.state.safe_remove_root(node.url)
 
     def _load_item(self, item: LoaderObj) -> dict:
         page_enum = item.name
         loader_fun = self.fun_registry.get_processor(page_enum, PipelineRegistries.LOAD)
-        temp = loader_fun.execute(item.params, self.db_conn)
-        return temp
+        return loader_fun.execute(item.params, self.db_conn)

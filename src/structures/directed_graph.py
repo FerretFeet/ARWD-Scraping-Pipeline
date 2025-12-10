@@ -258,52 +258,47 @@ class DirectionalGraph:
 
     def _propagate_completion(self, node: Node) -> bool:
         """
-        Recursively checks child states, propagates completion to the parent node,
-        and removes the node if it's fully completed and has no remaining children.
+        Recursively checks child states and updates the current node's state
+        if all necessary children have COMPLETED their work.
 
-        Returns True if the node was safely removed, False otherwise.
+        Returns:
+            True: If the node's state is now COMPLETED.
+            False: If the node is still busy, either locally or because a descendant is busy.
+
         """
-        # Check if the node is awaiting children (meaning its local work is done)
+        # 1. Local Completion Check: Has the node finished its own work?
+        # This function should only attempt to complete a node that has finished its local job.
         if (
-            node.state == PipelineStateEnum.AWAITING_CHILDREN
-            or node.set_state(PipelineStateEnum.COMPLETED)
+            node.state != PipelineStateEnum.AWAITING_CHILDREN
+            and node.state != PipelineStateEnum.COMPLETED
         ):
-            # Iterate over a copy because we might modify node.outgoing
-            children_to_remove = []
-            is_subtree_clean = True
+            # If the node is still RUNNING, FAILED, or PENDING, we stop here.
+            return False
 
-            for child in list(node.outgoing):
-                # Recursively check the child node
-                if self._propagate_completion(child):
-                    # If the child and its entire subtree were removed, flag it for parent removal
-                    children_to_remove.append(child)
-                else:
-                    # If the child is not complete OR its subtree is still busy, stop propagation
-                    is_subtree_clean = False
+        # If the node is already COMPLETED, treat it as clean and propagate True upward immediately.
+        if node.state == PipelineStateEnum.COMPLETED:
+            return True
 
-            # 2. Cleanup Outgoing Links
-            for child in children_to_remove:
-                with node.lock:
-                    node.remove_outgoing(child)
-                # Remove the incoming link on the child from the parent (if your graph requires it)
-                # child.incoming.remove(node) # Assuming this is required in your Node class
+        # --- At this point, node.state must be AWAITING_CHILDREN ---
 
-            # 3. State Propagation (Self-Completion)
-            if is_subtree_clean:
-                # All children are gone (or were already gone)
-                if node.state == PipelineStateEnum.AWAITING_CHILDREN:
-                    node.set_state(PipelineStateEnum.COMPLETED)  # Mark parent as completed
+        is_subtree_clean = True
 
-                # 4. Final Removal Check (Only happens if self is COMPLETED and has no more outgoing links)
-                if node.state == PipelineStateEnum.COMPLETED and not node.outgoing:
-                    # Actual node deletion from the graph's main 'nodes' structure
-                    self.state.remove_node(node)  # Assumes your DirectionalGraph has this method
-                    return True  # Node successfully removed
+        for child in node.outgoing:
+            child_is_completed = self._propagate_completion(child)
 
-        # If state isn't AWAITING_CHILDREN/COMPLETED or subtree is not clean
+            if not child_is_completed:
+                is_subtree_clean = False
+                break
+        # Update state
+        if is_subtree_clean:
+            # All children and their descendants are COMPLETED.
+            node.set_state(PipelineStateEnum.COMPLETED)
+
+            return True
+
         return False
 
-    def safe_delete_root(self, root_url: str) -> bool:
+    def safe_remove_root(self, root_url: str) -> bool:
         """
         Finds the root node associated with the URL and triggers recursive cleanup.
 
@@ -312,20 +307,30 @@ class DirectionalGraph:
         """
         parsed_netloc = parse_url(root_url).netloc
         domain_key = unquote(parsed_netloc)
-
-        root_node = domain_key if domain_key in self.roots else None
+        root_node = None
+        for node in self.roots:
+            if node.url == domain_key:
+                root_node = node
+                break
 
         if root_node is None:
             return False
 
         if self._propagate_completion(root_node):
-
-            node = self.roots.pop(domain_key)
-            del node
+            # True only if all nodes are able to be marked completed
+            self.roots.remove(root_node)
+            self.propogate_downward_deletion(root_node)
+            self.delete_node(root_node)
             print(f"Successfully deleted entire graph subtree for domain: {domain_key}")
             return True
 
         return False
+
+    def propogate_downward_deletion(self, node: Node) -> None:
+        if node.outgoing:
+            for outnode in node.outgoing:
+                self.propogate_downward_deletion(outnode)
+        self.delete_node(node)
 
 
     def find_in_graph(self, data_attrs: dict | None = None,

@@ -25,7 +25,6 @@ from src.utils.paths import project_root
 SQL_LOADER_BASE_PATH = project_root / "sql" / "dml"
 
 LOADER_CONFIG: dict = {
-
     # PipelineRegistryKeys.BILL: {
     #     "params": {
     #         #Required parameters
@@ -49,6 +48,13 @@ LOADER_CONFIG: dict = {
         },
         "name": "Upsert Legislator",
         "filepath": SQL_LOADER_BASE_PATH / "upsert_legislator.sql",
+    },
+    PipelineRegistryKeys.COMMITTEE: {
+        "params": {
+            "title",
+        },
+        "name": "Upsert Committee",
+        "filepath": SQL_LOADER_BASE_PATH / "upsert_committee.sql",
     },
 }
 

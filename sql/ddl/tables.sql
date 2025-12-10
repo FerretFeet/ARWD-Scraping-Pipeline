@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS bills (
 CREATE TABLE IF NOT EXISTS bill_documents (
     doc_id SERIAL PRIMARY KEY,
     fk_bill_id INT NOT NULL,
-    document_type doc_type NOT NULL,
+    document_type VARCHAR(40) NOT NULL,
     url TEXT NOT NULL,
     doc_date DATE,
     FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id)

@@ -78,7 +78,7 @@ class HTMLParser:
                     # If selector is a helper function
                     try:
                         data = val(soup)
-                        if not isinstance(data, list) and data is not None:
+                        if not isinstance(data, (list, dict, set)) and data is not None:
                             data = [data]
                         content_holder[key] = data
                     except (AttributeError, Exception) as e:

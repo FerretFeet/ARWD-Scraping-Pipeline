@@ -16,6 +16,7 @@ DECLARE
     v_legislator_id INT;
     v_history_id INT;
     v_existing_legislator_id INT;
+    v_target_committee_id INT;
 BEGIN
     -- STEP 1: Try to find an existing legislator based on name and URL (Identity Resolution)
     SELECT legislator_id INTO v_existing_legislator_id
@@ -42,41 +43,37 @@ BEGIN
 
     -- STEP 1.5: Insert Committee And/or Committee Memberships
     -- Close all memberships not in current list that have an open record before cur session
-    IF p_committee_ids IS NOT NULL THEN
-        FOREACH v_target_committee_id IN ARRAY p_committee_ids
-        LOOP
-            -- Check for and close any existing OPEN membership for this committee/legislator
-            -- that has a start date PRIOR to the new start date.
-            UPDATE committee_membership
-            SET membership_end = p_start_date - INTERVAL '1 day'
-            WHERE
-                fk_legislator_id = v_legislator_id
-                AND fk_committee_id = v_target_committee_id
-                AND membership_end IS NULL
-                AND membership_start < p_start_date;
-
-            -- Check if a membership already exists for the NEW start date (avoid duplicates on re-run)
-            IF NOT EXISTS (
-                SELECT 1 FROM committee_membership
-                WHERE fk_legislator_id = v_legislator_id
-                AND fk_committee_id = v_target_committee_id
-                AND membership_start = p_start_date
-            ) THEN
-                -- Insert the new membership record
-                INSERT INTO committee_membership (
-                    fk_committee_id,
-                    fk_legislator_id,
-                    membership_start
-                )
-                VALUES (
-                    v_target_committee_id,
-                    v_legislator_id,
-                    p_start_date
-                );
-            END IF;
-        END LOOP;
+UPDATE committee_membership
+SET membership_end = p_start_date - INTERVAL '1 day'
+WHERE fk_legislator_id = v_legislator_id
+  AND membership_end IS NULL
+  AND (
+        p_committee_ids IS NULL
+        OR fk_committee_id <> ALL(p_committee_ids)
+      )
+  AND membership_start < p_start_date;
+-- Insert new memberships (safe even if array is NULL)
+FOREACH v_target_committee_id IN ARRAY COALESCE(p_committee_ids, ARRAY[]::integer[])
+LOOP
+    -- Only insert if no open membership already exists
+    IF NOT EXISTS (
+        SELECT 1
+        FROM committee_membership
+        WHERE fk_legislator_id = v_legislator_id
+          AND fk_committee_id = v_target_committee_id
+          AND membership_end IS NULL
+    ) THEN
+        INSERT INTO committee_membership (
+            fk_committee_id,
+            fk_legislator_id,
+            membership_start
+        ) VALUES (
+            v_target_committee_id,
+            v_legislator_id,
+            p_start_date
+        );
     END IF;
-
+END LOOP;
     -- STEP 2: Handle the History (SCD Type 2 Logic)
     -- Check for the current (most recent and open) history record
     SELECT history_id INTO v_history_id
@@ -101,7 +98,8 @@ BEGIN
             -- Data changed (New Term/Role): Close the old history record
             UPDATE legislator_history
             SET end_date = p_start_date - INTERVAL '1 day'
-            WHERE history_id = v_history_id;
+            WHERE history_id = v_history_id
+                AND start_date < p_start_date;
         ELSE
             -- No major change: Exit, we don't need to insert a new history record
             RETURN v_legislator_id;

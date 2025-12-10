@@ -49,7 +49,7 @@ def fake_node():
     class Node:
         def __init__(self):
             self.id = "1"
-            self.url = "https://arkleg.state.ar.us/Legislators/List"
+            self.url = "arkleg.state.ar.us/Legislators/List?ddBienniumSession=2019%2F2019R"
             self.state = None
             self.data = {"html": "<html></html>"}
             self.type = "TEST"
@@ -171,7 +171,7 @@ class TestCrawlerWorker:
         ]
 
         worker.process(fake_node)
-        assert fake_node.state == PipelineStateEnum.COMPLETED
+        assert fake_node.state == PipelineStateEnum.AWAITING_CHILDREN
 
     def test_error_in_fetch_html(self, worker, fake_node, lifoqueues):
         fetch_q, process_q = lifoqueues
@@ -332,13 +332,14 @@ class TestProcessorWorker:
 
         assert fake_node.state == PipelineStateEnum.ERROR
 
-    def test_get_processing_templates(self, processor_worker):
+    def test_get_processing_templates(self, processor_worker, fake_node):
         processor_worker.fun_registry.get_processor.return_value = {
             "state_key": (lambda n, s: {}, lambda x: None),
             "a": ("sel", "tr"),
             "b": ("sel2", "tr2"),
         }
-        selector, transformer, state_pair = processor_worker._get_processing_templates("https://arkleg.state.ar.us/page")
+        selector, transformer, state_pair = processor_worker._get_processing_templates(
+            "https://arkleg.state.ar.us/page", fake_node)
         assert selector == {"a": "sel", "b": "sel2"}
         assert transformer == {"a": "tr", "b": "tr2"}
         assert state_pair is not None
@@ -358,7 +359,7 @@ class TestLoaderWorker:
         assert fake_loader_obj.node.data == {"db_result": "ok"}
         fake_db_conn.commit.assert_called_once()
         fake_db_conn.rollback.assert_not_called()
-        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node.url)
 
     def test_process_load_returns_none(self, loader_worker, fake_loader_obj, fake_db_conn):
         fake_loader = MagicMock()
@@ -403,4 +404,4 @@ class TestLoaderWorker:
         fake_graph.find_node.return_value = child_node
 
         loader_worker._remove_nodes(fake_loader_obj.node)
-        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.node.url)

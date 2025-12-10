@@ -66,13 +66,13 @@ class TestArStateLegislatorSelector:
                                      mock_processor_worker, fake_state):
 
         parentnode = list(fake_state.nodes.values())[-1]
-        node = Node(PipelineRegistryKeys.BILL, unescape("https://arkleg.state.ar.us/Bills/Detail?id=HB1001"),
+        node = Node(PipelineRegistryKeys.BILL, unescape("https://arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2019%2F2019R"),
                     incoming={parentnode}, data={"html": known_bill_html_fixture})
-        t_parser, t_transformer, state_pairs = mock_processor_worker._get_processing_templates(node.url)  # noqa: SLF001
+        t_parser, t_transformer, state_pairs = mock_processor_worker._get_processing_templates(node.url, node)  # noqa: SLF001
         print(f"NODE IS {node}")
         parsed_data = mock_processor_worker._parse_html(node.url,  # noqa: SLF001
                                           node.data["html"], t_parser)
-
+        parsed_data, t_transformer = mock_processor_worker.inject_session_code(parsed_data, t_transformer, node)
         result = mock_processor_worker._transform_data(parsed_data, t_transformer)  # noqa: SLF001
         result = mock_processor_worker._attach_state_values(node, result, t_transformer, state_pairs)  # noqa: SLF001
 
@@ -81,13 +81,7 @@ class TestArStateLegislatorSelector:
 
         assert result["title"] == "hb1001 - an act for the arkansas house of representatives of the ninety-fifth general assembly appropriation for the 2024-2025 fiscal year."
         assert result["bill_no"] == "hb1001"
-        assert result["bill_no_dwnld"] == [
-            "/Home/FTPDocument?path=%2FBills%2F2025R%2FPublic%2FHB1001.pdf",
-        ]
         assert result["act_no"] == "3"
-        assert result["act_no_dwnld"] == [
-            "/Acts/FTPDocument?path=%2FACTS%2F2025R%2FPublic%2F&file=3.pdf&ddBienniumSession=2025%2F2025R",
-        ]
         assert result["orig_chamber"] == "house"
         assert result["lead_sponsor"] == {"committee_id": [1]}
 
@@ -96,7 +90,7 @@ class TestArStateLegislatorSelector:
 
         assert result["intro_date"] == datetime.datetime(2025, 1, 13, 14, 39, 5, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
         assert result["act_date"] ==  datetime.datetime(2025, 1, 27, 0, 0, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
-        assert result["vote_links"] == [
-            "/Bills/Votes?id=HB1001&rcs=38&chamber=Senate&ddBienniumSession=2025%2F2025R",
-            "/Bills/Votes?id=HB1001&rcs=29&chamber=House&ddBienniumSession=2025%2F2025R",
-        ]
+        assert result["bill_documents"] == {"amendments": ["/home/ftpdocument?path=%2famend%2f2025r%2fpublic%2fhb1001-h1.pdf"],
+                                            "bill_text": ["/home/ftpdocument?path=%2fbills%2f2025r%2fpublic%2fhb1001.pdf"],
+                                            "act_text": ["/acts/ftpdocument?path=%2facts%2f2025r%2fpublic%2f&file=3.pdf&ddbienniumsession=2025%2f2025r"]}
+        assert result["session_code"] ==  "2019/2019R"

@@ -21,8 +21,10 @@ class PipelineLoader:
         self._template = None
 
     def execute(self, params: dict, db_conn: psycopg.Connection) -> None | dict:
+        self.validate_input(params)
+        prefixed_params = {f"p_{key}": value for key, value in params.items()}
         with db_conn.cursor() as cur:
-            cur.execute(self.sql_template, params)
+            cur.execute(self.sql_template, prefixed_params)
             db_conn.commit()
             return cur.fetchone()
 
