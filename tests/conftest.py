@@ -55,7 +55,7 @@ def html_selector_fixture(request):
     Also patches Crawler.get_page to return soup.
     """
     name, url, variant = request.param
-    force_refresh = request.config.getoption("--refresh-html-fixtures")
+    force_refresh = request.project_config.getoption("--refresh-html-fixtures")
 
     # Example: name="bill_page/bill", variant="v1"
     filename = f"html/{name}.{variant}.html"

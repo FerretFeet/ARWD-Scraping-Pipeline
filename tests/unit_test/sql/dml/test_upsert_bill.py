@@ -12,10 +12,10 @@ from src.data_pipeline.load.pipeline_loader import PipelineLoader
 # --------------------------------------------------------------------------
 @pytest.fixture
 def sql_file():
-    return "dml/upsert_bill_with_sponsors.sql"
+    return "dml/functions/upsert_bill_with_sponsors.sql"
 
 
-SQL_FILE = Path("sql/dml/upsert_bill_with_sponsors.sql")
+SQL_FILE = Path("sql/dml/functions/upsert_bill_with_sponsors.sql")
 
 
 # --------------------------------------------------------------------------
@@ -36,7 +36,7 @@ def clean_tables(db):
 @pytest.fixture
 def setup_session(db):
     db.execute("""
-        INSERT INTO sessions (session_code, name, start_date)
+        INSERT INTO sessions (session_code, session_name, start_date)
         VALUES ('2025A', '2025 Session', '2025-01-01')
         ON CONFLICT (session_code) DO NOTHING
         RETURNING session_code;
@@ -64,9 +64,9 @@ def setup_legislators(db):
 @pytest.fixture
 def setup_committees(db):
     ids = []
-    for name in ["Finance", "Education"]:
+    for name in [1, 2]:
         db.execute("""
-            INSERT INTO committees (name)
+            INSERT INTO committees (committee_id)
             VALUES (%s)
             RETURNING committee_id;
         """, (name,))
@@ -86,6 +86,7 @@ def sample_bill_data(setup_session, setup_legislators, setup_committees):
         "bill_documents": {
             "amendments": ["http://example.com/amend1"],
             "bill_text": ["http://example.com/bill_text"],
+            "act_text": [None],
         },
         "lead_sponsor": {"legislator_id": [setup_legislators[0]]},
         "other_primary_sponsor": {"committee_id": [setup_committees[0]]},

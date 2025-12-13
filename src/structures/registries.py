@@ -105,8 +105,11 @@ class ProcessorRegistry:
 
             {PipelineRegistryKey: {Stage: Processor}}
         """
-        for key, stage_map in config.items():
-            # Wrap the PipelineLoader class with its initialization parameters
+
+        # --- FIX: Define a factory function to capture the variables immediately ---
+        def create_loader_class(key, stage_map):
+            # The variables 'key' and 'stage_map' are now bound to the arguments
+            # of this factory function for each iteration.
             class Loader(PipelineLoader):
                 def __init__(self):
                     super().__init__(
@@ -116,9 +119,14 @@ class ProcessorRegistry:
                         stage_map["insert"],
                     )
 
-            # Register the class, not an instance
+            # Register the class using the correct key
             self.register(key, PipelineRegistries.LOAD)(Loader)
+
+        # --- End of Factory Function ---
+
+        for key, stage_map in config.items():
+            create_loader_class(key, stage_map) # Call the factory function in the loop
+
         if not config:
             msg = f"No config found for {PipelineRegistries.LOAD}"
             raise ValueError(msg)
-

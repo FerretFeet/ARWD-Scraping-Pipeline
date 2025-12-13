@@ -67,7 +67,7 @@ if [[ ${#function_files[@]} -eq 0 ]]; then
 fi
 
 for sql_file in "${function_files[@]}"; do
-    psql_exec "$DB_NAME" "$sql_file" "$ADMIN_USER" "$ADMIN_PASS"
+    psql_exec "$DB_NAME" "$sql_file" "$SCRAPER_USER" "$SCRAPER_PASS"
 done
 
 echo "=== SQL function initialization complete ==="

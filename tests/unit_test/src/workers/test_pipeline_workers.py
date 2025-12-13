@@ -1,4 +1,5 @@
 from queue import LifoQueue, Queue
+from unittest import mock
 from unittest.mock import MagicMock
 from urllib.parse import urlparse
 
@@ -377,7 +378,7 @@ class TestLoaderWorker:
         assert fake_loader_obj.data == {"db_result": "ok"}
         fake_db_conn.commit.assert_called_once()
         fake_db_conn.rollback.assert_not_called()
-        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.url)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.url, mock.ANY)
 
     def test_process_load_returns_none(self, loader_worker, fake_loader_obj, fake_db_conn):
         fake_loader = MagicMock()
@@ -422,4 +423,4 @@ class TestLoaderWorker:
         fake_graph.find_node.return_value = child_node
 
         loader_worker._remove_nodes(fake_loader_obj)
-        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.url)
+        fake_graph.safe_remove_root.assert_called_with(fake_loader_obj.url, mock.ANY)

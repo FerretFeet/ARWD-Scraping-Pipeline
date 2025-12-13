@@ -5,7 +5,7 @@ CREATE OR REPLACE FUNCTION insert_session(
 )
 RETURNS VARCHAR AS $$
     WITH ins AS (
-        INSERT INTO sessions (session_code, name, start_date)
+        INSERT INTO sessions (session_code, session_name, start_date)
         VALUES (p_session_code, p_name, p_start_date)
         ON CONFLICT (session_code) DO NOTHING
         RETURNING session_code

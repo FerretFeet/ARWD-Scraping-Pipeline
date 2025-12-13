@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION upsert_legislator(
     p_seniority INT,
     p_chamber chamber,
     p_party VARCHAR,
-    p_start_date DATE,
+    p_session_code VARCHAR,
     p_committee_ids INT[]
 ) RETURNS INT AS $$
 DECLARE
@@ -17,7 +17,16 @@ DECLARE
     v_history_id INT;
     v_existing_legislator_id INT;
     v_target_committee_id INT;
+    v_start_date DATE;
 BEGIN
+    SELECT start_date INTO v_start_date
+    FROM sessions
+    WHERE session_code = p_session_code
+    LIMIT 1;
+
+    IF v_start_date IS NULL THEN
+        RAISE EXCEPTION 'No session found for session_code: %', p_session_code;
+    END IF;
     -- STEP 1: Try to find an existing legislator based on name and URL (Identity Resolution)
     SELECT legislator_id INTO v_existing_legislator_id
     FROM legislators
@@ -44,11 +53,11 @@ BEGIN
     -- STEP 1.5: Insert Committee And/or Committee Memberships
     -- Close all memberships not in current list that have an open record before cur session
 UPDATE committee_membership
-SET membership_end = p_start_date - INTERVAL '1 day'
+SET membership_end = v_start_date - INTERVAL '1 day'
 WHERE fk_legislator_id = v_legislator_id
   AND membership_end IS NULL
   AND NOT (fk_committee_id = ANY(COALESCE(p_committee_ids, ARRAY[]::int[])))
-  AND membership_start < p_start_date;
+  AND membership_start < v_start_date;
 
 -- Insert new memberships (safe even if array is NULL)
 FOREACH v_target_committee_id IN ARRAY COALESCE(p_committee_ids, ARRAY[]::integer[])
@@ -68,7 +77,7 @@ LOOP
         ) VALUES (
             v_target_committee_id,
             v_legislator_id,
-            p_start_date
+            v_start_date
         );
     END IF;
 END LOOP;
@@ -95,9 +104,9 @@ END LOOP;
         ) THEN
             -- Data changed (New Term/Role): Close the old history record
             UPDATE legislator_history
-            SET end_date = p_start_date - INTERVAL '1 day'
+            SET end_date = v_start_date - INTERVAL '1 day'
             WHERE history_id = v_history_id
-                AND start_date < p_start_date;
+                AND start_date < v_start_date;
         ELSE
             -- No major change: Exit, we don't need to insert a new history record
             RETURN v_legislator_id;
@@ -106,7 +115,7 @@ END LOOP;
 
     -- STEP 3: Insert the new (current) history record
     INSERT INTO legislator_history (fk_legislator_id, district, seniority, chamber, url, party, start_date, end_date)
-    VALUES (v_legislator_id, p_district, p_seniority, p_chamber, p_url, p_party, p_start_date, NULL);
+    VALUES (v_legislator_id, p_district, p_seniority, p_chamber, p_url, p_party, v_start_date, NULL);
 
     RETURN v_legislator_id;
 

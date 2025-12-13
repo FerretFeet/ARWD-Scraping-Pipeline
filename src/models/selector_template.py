@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup
 
 from src.structures import directed_graph
+from src.structures.registries import get_enum_by_url
+from src.utils.strings.get_url_base_path import get_url_base_path
 
 Selector = str | tuple[str, str] | Callable[[BeautifulSoup], list[str] | None]
 
@@ -41,6 +43,10 @@ class SelectorTemplate:
 
         This function can be customized to fetch values based on node type or state_key.
         """
-        return state.search_ancestors(node, data_attrs, node_attrs)
+        node = state.search_ancestors(node, data_attrs, node_attrs)
+        if not node and node_attrs and "url" in node_attrs:
+            type_enum = get_enum_by_url(get_url_base_path(node_attrs["url"]))
+            state.add_new_node(node_attrs["url"], type_enum,
+                               [node])
 
 

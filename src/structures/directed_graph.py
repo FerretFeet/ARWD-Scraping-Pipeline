@@ -1,9 +1,10 @@
 import json
 import threading
 from collections import OrderedDict
+from html import unescape
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from urllib3.util import parse_url
 
@@ -48,7 +49,7 @@ class Node:
         self.type = node_type
         self.container = container
 
-        self.lock = threading.Lock()
+        # self.lock = threading.Lock()
 
         # Handle state input as Int (from JSON) or Enum
         if isinstance(state, int):
@@ -57,31 +58,31 @@ class Node:
             self.state = state
 
     def set_state(self, state: PipelineStateEnum) -> None:
-        with self.lock:
+        # with self.lock:
             self.state = state
     def add_container(self, container_ref: Any) -> None:
-        with self.lock:
+        # with self.lock:
             self.container = container_ref
 
     def add_incoming(self, incoming_ref: Any) -> None:
-        with self.lock:
+        # with self.lock:
             self.incoming.add(incoming_ref)
 
     def add_outgoing(self, outgoing_ref: Any) -> None:
-        with self.lock:
+        # with self.lock:
             self.outgoing.add(outgoing_ref)
 
     def remove_container(self, container_ref: Any) -> None:
         if self.container == container_ref:
-            with self.lock:
+            # with self.lock:
                 self.container = None
 
     def remove_incoming(self, incoming_ref: Any) -> None:
-        with self.lock:
+        # with self.lock:
             self.incoming.remove(incoming_ref)
 
     def remove_outgoing(self, outgoing_ref: Any) -> None:
-        with self.lock:
+        # with self.lock:
             self.outgoing.remove(outgoing_ref)
 
     def _compare(self, val1, val2):
@@ -89,7 +90,9 @@ class Node:
         if isinstance(val1, str) and isinstance(val2, str):
             # Treat strings starting with "/" or "http" as URLs
             if val1.startswith("http") or val2.startswith("/"):
-                return normalize_url(val2) in normalize_url(val1)
+                nval2 = normalize_url(val2)
+                nval1 = normalize_url(val1)
+                return nval2 in nval1
             return val1 == val2
         if isinstance(val1, (int, float, bool)):
             return val1 == val2
@@ -111,11 +114,13 @@ class Node:
             for key, value in data_attrs.items():
                 if key not in self.data:
                     should_visit = False
+                    return False
                     break
                 node_value = self.data[key]
                 if value is not None and node_value != value:
                     should_visit = False
-                    break
+                    return False
+        if should_visit is False: return False
         if node_attrs:
             for key, value in node_attrs.items():
                 node_value = getattr(self, key, None)
@@ -175,16 +180,49 @@ class DirectionalGraph:
         self.roots: set[Node] = set()
         if nodes is not None:
             self.load_node_list(nodes)
+        self.lock = threading.RLock()
+    def add_node(self, node: Node) -> None:
+        with self.lock:
+            self.nodes.update({unquote(unescape(node.url)): node})
+
+    def set_nodes(self, nodes: OrderedDict[str, Node] | None) -> None:
+        with self.lock:
+            self.nodes = nodes
+
+    def get_nodes(self):
+        # with self.lock:
+            return self.nodes.copy()
+    def remove_node(self, node: Node) -> Node:
+        with self.lock:
+            return self.nodes.pop(node.url)
+
+    def get_roots(self):
+        with self.lock:
+            return self.roots.copy()
+
+    def remove_root(self, node: Node) -> None:
+        with self.lock:
+            return self.roots.remove(node)
+
+    def add_root(self, node: Node) -> None:
+        with self.lock:
+            self.roots.add(node)
+
+    def set_root(self, nodes: set[Node] | None) -> None:
+        with self.lock:
+            self.roots = nodes
 
     def load_node_list(self, nodes: list[Node]):
-        for node in nodes:
-            self.nodes[node.url] = node
+        with self.lock:
+            for node in nodes:
+                self.nodes[node.url] = node
 
 
     def reset(self):
         """Reset graph."""
-        self.nodes: OrderedDict[str, Node] = OrderedDict()
-        self.roots: set[Node] = set()
+        with self.lock:
+            self.nodes = OrderedDict()
+            self.roots = set()
 
     def add_new_node(self, url:str, node_type: PipelineRegistryKeys,
                      incoming: list[Node] | None, *, outgoing: list[Node] | None = None,
@@ -217,18 +255,25 @@ class DirectionalGraph:
 
         return self.add_existing_node(new_node, isRoot=isRoot)
 
-    def add_existing_node(self, node: Node, *, isRoot: bool = False) -> Node:  # noqa: N803
+    def set_node_state(self, node: Node, state: PipelineStateEnum) -> None:
+        with self.lock:
+            node.set_state(state)
+
+    def add_existing_node(self, node: Node, *, isRoot: bool = False) -> Node | None:  # noqa: N803
         """Add node to graph."""
         node.add_container(self)
-        self.nodes[unquote(node.url)] = node
-        if isRoot:
-            if self.roots:
+        with self.lock:
+            if unquote(unescape(node.url)) in self.nodes:
+                return None
+            self.nodes.update({unquote(unescape(node.url)): node})
+            if isRoot:
+                if self.roots:
+                    self.roots.add(node)
+                else:
+                    self.roots = {node}
+            if len(node.incoming) == 0 and node not in self.roots:
                 self.roots.add(node)
-            else:
-                self.roots = {node}
-        if len(node.incoming) > 0:
-            self.roots.add(node)
-        return node
+            return node
 
     def find_node_by_url(self, url: str) -> Node | None:
         """Find node by url."""
@@ -236,22 +281,25 @@ class DirectionalGraph:
 
     def delete_node(self, node: Node) -> None:
         """Remove node from graph."""
-        delnode = self.nodes.pop(unquote(node.url), None)
-        if delnode is None: return
-        for outnode in list(delnode.outgoing):
-            outnode.remove_incoming(delnode)
-        for innode in list(delnode.incoming):
-            innode.remove_outgoing(delnode)
-        if delnode in self.roots:
-            self.roots.remove(delnode)
-        del delnode
+        with self.lock:
+            if not self.nodes.get(unquote(unescape(node.url))): return
+            delnode = self.nodes.pop(unquote(unescape(node.url)))
+            if delnode is None: return
+            if delnode in self.roots:
+                self.roots.remove(delnode)
+            for outnode in list(delnode.outgoing):
+                outnode.remove_incoming(delnode)
+            for innode in list(delnode.incoming):
+                innode.remove_outgoing(delnode)
+            del delnode
 
     def cleanup(self) -> None:
         """Clean up graph. Remove orphaned nodes."""
-        copied_nodes = self.nodes.copy().values()
-        for node in copied_nodes:
-            if len(node.outgoing) == 0 and len(node.incoming) == 0:
-                self.delete_node(node)
+        with self.lock:
+            copied_nodes = self.get_nodes().values()
+            for node in copied_nodes:
+                if len(node.outgoing) == 0 and len(node.incoming) == 0:
+                    self.delete_node(node)
 
     def _propagate_completion(self, node: Node) -> bool:
         """
@@ -279,25 +327,25 @@ class DirectionalGraph:
         # --- At this point, node.state must be AWAITING_CHILDREN ---
 
         is_subtree_clean = True
+        with self.lock:
+            for child in node.outgoing:
+                child_is_completed = self._propagate_completion(child)
 
-        for child in node.outgoing:
-            child_is_completed = self._propagate_completion(child)
+                if not child_is_completed:
+                    is_subtree_clean = False
+                    break
+            # Update state
+            if is_subtree_clean:
+                # All children and their descendants are COMPLETED.
+                node.set_state(PipelineStateEnum.COMPLETED)
 
-            if not child_is_completed:
-                is_subtree_clean = False
-                break
-        # Update state
-        if is_subtree_clean:
-            # All children and their descendants are COMPLETED.
-            node.set_state(PipelineStateEnum.COMPLETED)
+                return True
 
-            return True
+            return False
 
-        return False
-
-    def safe_remove_root(self, root_url: str) -> bool:
+    def safe_remove_root(self, root_url: str, known_roots_cache_file: Path | None) -> bool:
         """
-        Finds the root node associated with the URL and triggers recursive cleanup.
+        Find the root node associated with the URL and triggers recursive cleanup.
 
         If the entire subtree is complete and removed, the root key is removed from
         the Orchestrator's internal roots tracking.
@@ -305,37 +353,42 @@ class DirectionalGraph:
         parsed_netloc = parse_url(root_url).netloc
         domain_key = unquote(parsed_netloc)
         root_node = None
-        for node in self.roots:
-            if node.url == domain_key:
-                root_node = node
-                break
+        with self.lock:
+            for node in self.roots:
+                if unquote(urlparse(node.url).netloc).strip() == domain_key.strip():
+                    root_node = node
+                    break
 
-        if root_node is None:
+            if root_node is None:
+                return False
+
+            if self._propagate_completion(root_node):
+                # True only if all nodes are able to be marked completed
+                self.remove_root(root_node)
+                self.propogate_downward_deletion(root_node)
+                if known_roots_cache_file:
+                    self.save_completed_root_url(root_node.url, known_roots_cache_file)
+                self.delete_node(root_node)
+                logger.info(f"deleting entire graph subtree for domain: {domain_key}")
+                return True
             return False
-
-        if self._propagate_completion(root_node):
-            # True only if all nodes are able to be marked completed
-            self.roots.remove(root_node)
-            self.propogate_downward_deletion(root_node)
-            self.delete_node(root_node)
-            logger.info(f"Successfully deleted entire graph subtree for domain: {domain_key}")
-            return True
-
-        return False
 
     def propogate_downward_deletion(self, node: Node) -> None:
         if node.outgoing:
-            for outnode in node.outgoing:
-                self.propogate_downward_deletion(outnode)
+            with self.lock:
+                for outnode in node.outgoing.copy():
+                    self.propogate_downward_deletion(outnode)
         self.delete_node(node)
 
 
     def find_in_graph(self, data_attrs: dict | None = None,
-                      node_attrs: dict | None = None) -> Node | None:
+                      node_attrs: dict | None = None, *, find_single: bool = True) -> Node | None | list[Node]:
         """Find node by node attrs or node data attrs."""
-        result = [node for node in self.nodes.values()
+        result = [node for node in self.get_nodes().values()
                   if node._isMatch(data_attrs=data_attrs, node_attrs=node_attrs)]  # noqa: SLF001
-        return result[0] if result else None
+        if result:
+            return result[0] if find_single else result
+        return None
 
     def search_ancestors(self, node: Node, data_attrs: dict | None = None,
                          node_attrs: dict | None = None):
@@ -366,47 +419,72 @@ class DirectionalGraph:
         return None
 
     def to_JSON(self) -> str:  # noqa: N802
-        """Serialize IndexedTree to a JSON string."""
+        """Serialize DirectionalGraph to a JSON string."""
+
+        def _json_default(obj):
+            if hasattr(obj, "isoformat"):
+                return obj.isoformat()
+            return str(obj)
+
         data = {
             "name": self.name,
+            # store nodes as list of dicts
             "nodes": [node.to_dict() for node in self.nodes.values()],
+            # store roots as list of node ids (simpler to restore)
+            "roots": [node.id for node in self.roots],
         }
-        return json.dumps(data, indent=4)
-
+        return json.dumps(data, indent=4, default=_json_default)
 
     def from_JSON(self, json_str: str) -> None:
+        """Load graph from JSON string (replaces current graph)."""
         data = json.loads(json_str)
+        # clear current state
         self.nodes.clear()
+        self.roots = set()
         self.name = data.get("name", "Directional Graph")
 
-        node_map = {}
+        node_map: dict[int, Node] = {}
         temp_links = []
 
-        nodes_data = data.get("nodes", [])  # <-- safe default
+        nodes_data = data.get("nodes", [])
 
-        # Pass 1: Create all Nodes (without links)
+        # Pass 1: Create nodes (no links)
         for node_data in nodes_data:
+            # Convert stored int type into PipelineRegistryKeys enum
+            raw_type = node_data["type"]
+            try:
+                # if stored as int
+                node_type_enum = PipelineRegistryKeys(raw_type)
+            except Exception:
+                # if it's already an enum value or string, try to handle gracefully
+                try:
+                    node_type_enum = PipelineRegistryKeys(node_data["type"])
+                except Exception:
+                    # fallback: leave as-is (but this is not ideal)
+                    node_type_enum = node_data["type"]
+
             new_node = Node(
-                node_type=node_data["node_type"],
-                url=node_data["url"],
-                data=node_data["data"],
-                state=node_data["state"],
-                override_id=node_data["id"],
+                node_type=node_type_enum,
+                url=node_data.get("url"),
+                data=node_data.get("data", {}),
+                state=node_data.get("state", PipelineStateEnum.CREATED),
+                override_id=node_data.get("id"),
             )
-            self.nodes[new_node.url] = new_node
+            # Use normalized url key to match add_existing_node/getters
+            self.nodes[unquote(unescape(new_node.url))] = new_node
             node_map[new_node.id] = new_node
 
             temp_links.append(
                 {
                     "node": new_node,
-                    "out_ids": node_data["outgoing_ids"],
-                    "in_ids": node_data["incoming_ids"],
+                    "out_ids": node_data.get("outgoing_ids", []),
+                    "in_ids": node_data.get("incoming_ids", []),
                 },
             )
 
-        # Pass 2: Re-establish links
+        # Pass 2: Re-establish links (incoming/outgoing sets)
         for item in temp_links:
-            current_node = item["node"]
+            current_node: Node = item["node"]
             for out_id in item["out_ids"]:
                 if out_id in node_map:
                     current_node.add_outgoing(node_map[out_id])
@@ -414,35 +492,62 @@ class DirectionalGraph:
                 if in_id in node_map:
                     current_node.add_incoming(node_map[in_id])
 
-        # Restore Node ID counter
+        # Restore roots by id list if present
+        root_ids = data.get("roots", [])
+        for rid in root_ids:
+            if rid in node_map:
+                self.roots.add(node_map[rid])
+
+        # Restore Node.id_counter to avoid ID collisions
         if self.nodes:
             Node.id_counter = max(node.id for node in self.nodes.values()) + 1
 
-    def save_file(self, filepath: Path) -> None:
-        """Save tree to a file."""
+
+    def save_completed_root_url(self, nodeurl: str, filepath: Path) -> None:
+        """Append deleted root url to a file."""
         filepath.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with Path.open(filepath, "w") as f:
-                f.write(self.to_JSON())
-            logger.info(f"Tree saved to {filepath}")
+            # open through the Path instance
+            with filepath.open("a", encoding="utf-8") as f:
+                f.write(nodeurl + "\n")
+            logger.info(f"Deleted root url saved to {filepath}")
         except OSError as e:
             logger.error(f"Error saving file: {e}")
 
+    def save_file(self, filepath: Path) -> None:
+        """Save tree to a file."""
+        with self.lock:
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with filepath.open("w", encoding="utf-8") as f:
+                    f.write(self.to_JSON())
+                logger.info(f"Tree saved to {filepath}")
+            except OSError as e:
+                logger.error(f"Error saving file: {e}")
+
     def load_from_file(self, filepath: Path) -> None | int:
-        """Load tree from a file."""
-        if not Path(filepath).exists():
-            msg = f"{filepath} does not exist."
-            # raise FileNotFoundError(msg)
+        """Load tree from a file. Returns 1 on success, None on failure."""
+        with self.lock:
+            if not filepath.exists():
+                msg = f"{filepath} does not exist."
+                logger.warning(msg)
+                return None
+
+            try:
+                with filepath.open("r", encoding="utf-8") as f:
+                    json_str = f.read()
+            except OSError as e:
+                logger.error(f"Error reading file {filepath}: {e}")
+                return None
+
+            self.from_JSON(json_str)
+            if self.nodes:
+                logger.info(
+                    f"Tree loaded from {filepath} with {len(self.nodes)} nodes, {len(self.roots)} roots FROM JSON"
+                    f"\nroots: {self.roots}",
+                )
+                return 1
             return None
-
-        with Path.open(filepath) as f:
-            json_str = f.read()
-
-        self.from_JSON(json_str)
-        if self.nodes:
-            logger.info(f"Tree loaded from {filepath}")
-            return 1
-        return None
 
     def __repr__(self) -> str:
         """Represent IndexedTree as a string."""

@@ -21,9 +21,9 @@ def known_bill_list_html_fixture() -> str:
         return html
 
 
-class TestBillCategoryFetchSelector:
+class TestCommitteeCategoryFetchSelector:
     @patch.object(webcrawler.Crawler, "get_page")
-    def test_known_bill_list_known_return(self, mock_get_page, known_bill_list_html_fixture):
+    def test_known_committee_cat_list_known_return(self, mock_get_page, known_bill_list_html_fixture):
         selector = CommitteeCategories().selectors
         parser = HTMLParser()
         result = parser.get_content(selector, known_bill_list_html_fixture)

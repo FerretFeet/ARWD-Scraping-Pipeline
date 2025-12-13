@@ -4,6 +4,8 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
+from src.utils.paths import project_root
+
 
 def setup_logger(log_path: str = "app.log") -> logging.Logger:
     """Initialize logger."""
@@ -13,7 +15,7 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
 
     # --- General log (INFO+) ---
     general_handler = RotatingFileHandler(
-        log_path,
+        project_root / log_path,
         maxBytes=5 * 1024 * 1024,  # 5 MB
         backupCount=3,
     )
@@ -22,7 +24,7 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
 
     # --- Warnings/errors log (WARNING+) ---
     warning_handler = RotatingFileHandler(
-        "warnings_" + log_path,
+        project_root / str("warnings_" + log_path),
         maxBytes=2 * 1024 * 1024,  # 2 MB
         backupCount=5,
     )
@@ -34,7 +36,8 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
     # --- Console logging (optional) ---
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    console_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s]"
+                                                   " %(filename)s:%(lineno)d - %(message)s"))
 
     # Add handlers
     logger.addHandler(general_handler)

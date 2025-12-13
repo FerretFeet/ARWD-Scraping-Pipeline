@@ -12,61 +12,61 @@ from src.data_pipeline.load.pipeline_loader import PipelineLoader
 
 @pytest.fixture
 def sql_file():
-    return "dml/upsert_legislator.sql"
+    return "dml/functions/upsert_legislator.sql"
 
 @pytest.fixture
 def sql_file_path():
-    return Path("sql/dml/upsert_legislator.sql")
-
+    return Path("sql/dml/functions/upsert_legislator.sql")
 
 @pytest.fixture
 def loader(sql_file_path):
     return PipelineLoader(
         sql_file_path=sql_file_path,
-        upsert_function_name="upsert_legislator",
+        upsert_function_name="Upsert Legislator",
         required_params={
             "first_name": str,
             "last_name": str,
             "url": str,
-            "phone": str,
-            "email": str,
-            "address": str,
             "district": str,
             "seniority": int,
             "chamber": str,
-            "party": str,
-            "start_date": date,
-            "committee_ids": list,
+            "session_code": str,
         },
-        insert="SELECT upsert_legislator("
-               "p_first_name := %(p_first_name)s, "
-               "p_last_name := %(p_last_name)s, "
-               "p_url := %(p_url)s, "
-               "p_phone := %(p_phone)s, "
-               "p_email := %(p_email)s, "
-               "p_address := %(p_address)s, "
-               "p_district := %(p_district)s, "
-               "p_seniority := %(p_seniority)s, "
-               "p_chamber := %(p_chamber)s, "
-               "p_party := %(p_party)s, "
-               "p_start_date := %(p_start_date)s, "
-               "p_committee_ids := %(p_committee_ids)s);",
+        insert="""SELECT upsert_legislator(
+               p_first_name := %(p_first_name)s,
+               p_last_name := %(p_last_name)s,
+               p_url := %(p_url)s,
+               p_phone := %(p_phone)s,
+               p_email := %(p_email)s,
+               p_address := %(p_address)s,
+               p_district := %(p_district)s,
+               p_seniority := %(p_seniority)s,
+               p_chamber := %(p_chamber)s,
+               p_party := %(p_party)s,
+               p_session_code := %(p_session_code)s,
+               p_committee_ids := %(p_committee_ids)s::int[]
+               ) AS legislator_id;""",
     )
-
 
 # --------------------------------------------------------------------------
 # Helper functions
 # --------------------------------------------------------------------------
-def _insert_committee(db, name, url=None):
-    db.execute("""
-        INSERT INTO committees (name, url)
-        VALUES (%s, %s)
-        ON CONFLICT (name) DO UPDATE
-        SET url = COALESCE(EXCLUDED.url, committees.url)
-        RETURNING committee_id
-    """, (name, url))
-    return db.fetchone()["committee_id"]
 
+def _insert_session(db, code, name, start_date):
+    """Helper to ensure session exists for lookup."""
+    db.execute("""
+        INSERT INTO sessions (session_code, session_name, start_date)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (session_code) DO NOTHING
+    """, (code, name, start_date))
+
+def _insert_committee(db, comm_id):
+    db.execute("""
+        INSERT INTO committees (committee_id)
+        VALUES (%s)
+        ON CONFLICT (committee_id) DO NOTHING;
+    """, (comm_id,))
+    return comm_id
 
 def _default_legislator_data(**overrides):
     data = {
@@ -79,18 +79,26 @@ def _default_legislator_data(**overrides):
         "district": "1",
         "seniority": 1,
         "chamber": "house",
-        "party": "D",
-        "start_date": date(2020, 1, 1),
+        "party": "d",
+        "session_code": "2020-REG",  # CHANGED: Default session
         "committee_ids": [],
     }
     data.update(overrides)
     return data
 
-
 # ===========================================================================
 # Test Suite
 # ===========================================================================
 class TestPipelineLoaderUpsertLegislator:
+
+    # ----------------------------------------------------------------------
+    # Setup: Ensure sessions exist for start_date lookups
+    # ----------------------------------------------------------------------
+    @pytest.fixture(autouse=True)
+    def setup_sessions(self, db):
+        """Pre-populate sessions table so SQL lookups succeed."""
+        _insert_session(db, "2020-REG", "2020", date(2020, 1, 1))
+        _insert_session(db, "2021-REG", "2021", date(2021, 1, 1))
 
     # ----------------------------------------------------------------------
     # 1. Basic insert
@@ -133,7 +141,8 @@ class TestPipelineLoaderUpsertLegislator:
     # ----------------------------------------------------------------------
     def test_scd2_creates_new_history_when_district_changes(self, db, loader):
         data1 = _default_legislator_data(first_name="Dana", last_name="Ray", district="1")
-        data2 = _default_legislator_data(first_name="Dana", last_name="Ray", district="2", start_date=date(2021, 1, 1))
+        # CHANGED: start_date=... -> session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Dana", last_name="Ray", district="2", session_code="2021-REG")
         loader.execute(data1, db)
         loader.execute(data2, db)
 
@@ -142,7 +151,7 @@ class TestPipelineLoaderUpsertLegislator:
 
     def test_scd2_triggers_on_party_change(self, db, loader):
         data1 = _default_legislator_data(first_name="Eve", last_name="Adams", party="D")
-        data2 = _default_legislator_data(first_name="Eve", last_name="Adams", party="R", start_date=date(2021,1,1))
+        data2 = _default_legislator_data(first_name="Eve", last_name="Adams", party="R", session_code="2021-REG")
         loader.execute(data1, db)
         loader.execute(data2, db)
 
@@ -151,7 +160,8 @@ class TestPipelineLoaderUpsertLegislator:
 
     def test_scd2_triggers_on_chamber_change(self, db, loader):
         data1 = _default_legislator_data(first_name="Gail", last_name="Ivy", chamber="house")
-        data2 = _default_legislator_data(first_name="Gail", last_name="Ivy", chamber="senate", start_date=date(2020,1,1))
+        # CHANGED: start_date=... -> session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Gail", last_name="Ivy", chamber="senate", session_code="2021-REG")
         loader.execute(data1, db)
         loader.execute(data2, db)
 
@@ -162,8 +172,8 @@ class TestPipelineLoaderUpsertLegislator:
     # 5. Committee memberships
     # ----------------------------------------------------------------------
     def test_insert_new_committees_on_first_upsert(self, db, loader):
-        c1 = _insert_committee(db, "Agriculture")
-        c2 = _insert_committee(db, "Budget")
+        c1 = _insert_committee(db, 1)
+        c2 = _insert_committee(db, 2)
         data = _default_legislator_data(first_name="Katie", last_name="Lee", committee_ids=[c1, c2])
         loader.execute(data, db)
 
@@ -171,7 +181,7 @@ class TestPipelineLoaderUpsertLegislator:
         assert db.fetchone()["count"] == 2
 
     def test_re_running_upsert_does_not_duplicate_memberships(self, db, loader):
-        c1 = _insert_committee(db, "Agriculture-B")
+        c1 = _insert_committee(db, 1)
         data = _default_legislator_data(first_name="Sam", last_name="Wise", committee_ids=[c1])
         loader.execute(data, db)
         loader.execute(data, db)
@@ -180,53 +190,57 @@ class TestPipelineLoaderUpsertLegislator:
         assert db.fetchone()["count"] == 1
 
     def test_existing_memberships_are_closed_if_removed_from_list(self, db, loader):
-        c1 = _insert_committee(db, "Finance")
-        c2 = _insert_committee(db, "Judiciary")
+        c1 = _insert_committee(db, 1)
+        c2 = _insert_committee(db, 2)
         data1 = _default_legislator_data(first_name="Sync", last_name="Test", committee_ids=[c1, c2])
-        data2 = _default_legislator_data(first_name="Sync", last_name="Test", start_date=date(2021,1,1), committee_ids=[c1])
+        # CHANGED: session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Sync", last_name="Test", session_code="2021-REG", committee_ids=[c1])
         loader.execute(data1, db)
         loader.execute(data2, db)
 
-        # Judiciary should be closed
+        # Judiciary should be closed (2021-01-01 - 1 day = 2020-12-31)
         db.execute("SELECT membership_end FROM committee_membership WHERE fk_committee_id=%s;", (c2,))
         assert str(db.fetchone()["membership_end"]) == "2020-12-31"
 
-        # Finance old membership still open
+        # Finance old membership still open (no end date)
         db.execute("SELECT membership_end FROM committee_membership WHERE fk_committee_id=%s AND membership_start='2020-01-01';", (c1,))
         assert db.fetchone()["membership_end"] is None
 
-        # Finance new membership (if inserted) is open
+        # Finance new membership (if inserted) - logic dictates it shouldn't re-insert if open, so check basic existence
         db.execute("SELECT membership_end FROM committee_membership WHERE fk_committee_id=%s AND membership_start='2021-01-01';", (c1,))
         row = db.fetchone()
         if row:
             assert row["membership_end"] is None
 
     def test_committee_membership_array_null(self, db, loader):
-        c1 = _insert_committee(db, "Finance-Null")
+        c1 = _insert_committee(db, 1)
         data1 = _default_legislator_data(first_name="Null", last_name="Committee", committee_ids=[c1])
         loader.execute(data1, db)
-        data2 = _default_legislator_data(first_name="Null", last_name="Committee", start_date=date(2021,1,1), committee_ids=None)
+        # CHANGED: session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Null", last_name="Committee", session_code="2021-REG", committee_ids=None)
         loader.execute(data2, db)
 
         db.execute("SELECT membership_end FROM committee_membership WHERE fk_committee_id=%s;", (c1,))
         assert str(db.fetchone()["membership_end"]) == "2020-12-31"
 
     def test_committee_membership_array_empty(self, db, loader):
-        c1 = _insert_committee(db, "Finance-Empty")
+        c1 = _insert_committee(db, 2)
         data1 = _default_legislator_data(first_name="Empty", last_name="Committee", committee_ids=[c1])
         loader.execute(data1, db)
-        data2 = _default_legislator_data(first_name="Empty", last_name="Committee", start_date=date(2021,1,1), committee_ids=[])
+        # CHANGED: session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Empty", last_name="Committee", session_code="2021-REG", committee_ids=[])
         loader.execute(data2, db)
 
         db.execute("SELECT membership_end FROM committee_membership WHERE fk_committee_id=%s;", (c1,))
         assert str(db.fetchone()["membership_end"]) == "2020-12-31"
 
     def test_multiple_committee_memberships_added_and_removed(self, db, loader):
-        c1 = _insert_committee(db, "C1")
-        c2 = _insert_committee(db, "C2")
-        c3 = _insert_committee(db, "C3")
+        c1 = _insert_committee(db, 1)
+        c2 = _insert_committee(db, 2)
+        c3 = _insert_committee(db, 3)
         data1 = _default_legislator_data(first_name="Multi", last_name="Committee", committee_ids=[c1, c2, c3])
-        data2 = _default_legislator_data(first_name="Multi", last_name="Committee", start_date=date(2021,1,1), committee_ids=[c1, c3])
+        # CHANGED: session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Multi", last_name="Committee", session_code="2021-REG", committee_ids=[c1, c3])
         loader.execute(data1, db)
         loader.execute(data2, db)
 
@@ -240,7 +254,7 @@ class TestPipelineLoaderUpsertLegislator:
             assert db.fetchone()["membership_end"] is None
 
     def test_committee_membership_duplicate_dates(self, db, loader):
-        c1 = _insert_committee(db, "DupC")
+        c1 = _insert_committee(db, 1)
         data = _default_legislator_data(first_name="Dup", last_name="Committee", committee_ids=[c1])
         loader.execute(data, db)
         loader.execute(data, db)
@@ -249,7 +263,7 @@ class TestPipelineLoaderUpsertLegislator:
         assert db.fetchone()["count"] == 1
 
     def test_committee_duplicates_in_array(self, db, loader):
-        c1 = _insert_committee(db, "C-Dup")
+        c1 = _insert_committee(db, 2)
         data = _default_legislator_data(first_name="DupArray", last_name="Test", committee_ids=[c1, c1, c1])
         loader.execute(data, db)
 
@@ -263,7 +277,8 @@ class TestPipelineLoaderUpsertLegislator:
 
     def test_history_triggers_on_url_change(self, db, loader):
         data1 = _default_legislator_data(first_name="URL", last_name="Test", url="old_url")
-        data2 = _default_legislator_data(first_name="URL", last_name="Test", url="new_url", start_date=date(2021,1,1))
+        # CHANGED: session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="URL", last_name="Test", url="new_url", session_code="2021-REG")
         loader.execute(data1, db)
         loader.execute(data2, db)
 
@@ -278,11 +293,28 @@ class TestPipelineLoaderUpsertLegislator:
         db.execute("SELECT COUNT(*) FROM legislator_history;")
         assert db.fetchone()["count"] == 1
 
+    def test_history_no_update_if_only_session_change(self, db, loader):
+        c1 = _insert_committee(db, 1)
+        c2 = _insert_committee(db, 2)
+        data1 = _default_legislator_data(first_name="Combo", last_name="Test", party="R",
+                                         session_code="2020-REG", committee_ids=[c1, c2])
+        data2 = _default_legislator_data(first_name="Combo", last_name="Test", party="R",
+                                         session_code="2021-REG", committee_ids=[c1, c2])
+
+        loader.execute(data1, db)
+        loader.execute(data2, db)
+
+        db.execute("SELECT COUNT(*) FROM legislator_history;")
+        assert db.fetchone()["count"] == 1
+        db.execute("SELECT end_date FROM legislator_history;")
+        assert db.fetchone()["end_date"] is None
+
     def test_history_and_committee_change_simultaneously(self, db, loader):
-        c1 = _insert_committee(db, "Combo1")
-        c2 = _insert_committee(db, "Combo2")
+        c1 = _insert_committee(db, 1)
+        c2 = _insert_committee(db, 2)
         data1 = _default_legislator_data(first_name="Combo", last_name="Test", committee_ids=[c1])
-        data2 = _default_legislator_data(first_name="Combo", last_name="Test", party="R", start_date=date(2021,1,1), committee_ids=[c1, c2])
+        # CHANGED: session_code="2021-REG"
+        data2 = _default_legislator_data(first_name="Combo", last_name="Test", party="R", session_code="2021-REG", committee_ids=[c1, c2])
         loader.execute(data1, db)
         loader.execute(data2, db)
 

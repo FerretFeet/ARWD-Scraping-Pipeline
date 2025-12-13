@@ -2,12 +2,12 @@
 import time
 from dataclasses import dataclass
 from queue import LifoQueue, Queue
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import psycopg
 
 from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
-from src.config.settings import state_cache_file
+from src.config.settings import known_links_cache_file, state_cache_file
 from src.data_pipeline.extract.html_parser import HTMLParser
 from src.data_pipeline.extract.webcrawler import Crawler
 from src.data_pipeline.transform.pipeline_transformer import PipelineTransformer
@@ -68,9 +68,22 @@ class CrawlerWorker(BaseWorker):
         self.fetch_scheduler = fetch_scheduler
 
     def process(self, node: directed_graph.Node) -> None:
+        # print(f"Fetchers state: {self.state.get_roots()}")
+        unqueued_nodes = self.state.find_in_graph(
+            None, {"state": PipelineStateEnum.CREATED}, find_single=False,
+        )
+        if unqueued_nodes:
+            for idx, tnode in enumerate(unqueued_nodes.copy()):
+                tnode.set_state(PipelineStateEnum.AWAITING_FETCH)
+                if idx == 0:
+                    self.input_queue.put(node) # replace to ensure it doesn't bury the needed nodes
+                    node = tnode
+                    continue
+                self.input_queue.put(tnode)
+
         final_flag = False
         self.create_crawlers(self.state.roots)
-        while True:
+        while True: # loop to try to keep order while using scheduler
             working_node = self._check_scheduler(node)
             if working_node is node:
                 final_flag = True
@@ -79,17 +92,23 @@ class CrawlerWorker(BaseWorker):
                     logger.info(f"[{self.name.upper()}]: Going to sleep until next node ready.")
                     time.sleep(self.fetch_scheduler.time_until_next())
                 continue
-            self._set_state(working_node, PipelineStateEnum.FETCHING)
-            html = self._fetch_html(working_node.url)
-            links: dict = self._parse_html(working_node.url, html)
-            if links:
-                self._enqueue_links(node, links)
-            if self._check_processing_step(working_node.url):
-                working_node.data["html"] = html
-                self._set_state(working_node, PipelineStateEnum.AWAITING_PROCESSING)
-                self.output_queue.put(working_node)
-            else: # No next step, dont send to queue
-                self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
+            try:
+                self._set_state(working_node, PipelineStateEnum.FETCHING)
+                html = self._fetch_html(working_node.url)
+                links: dict = self._parse_html(working_node.url, html)
+                if links:
+                    self._enqueue_links(node, links)
+                if self._check_processing_step(working_node.url):
+                    working_node.data["html"] = html
+                    self._set_state(working_node, PipelineStateEnum.AWAITING_PROCESSING)
+                    self.output_queue.put(working_node)
+                else: # No next step, dont send to queue
+                    self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
+                    node.data = links
+            except Exception as e:
+                logger.error(f"[{self.name.upper()}]: {e}")
+                self._set_state(working_node, PipelineStateEnum.ERROR)
+                raise
             if final_flag:
                 break
 
@@ -106,15 +125,21 @@ class CrawlerWorker(BaseWorker):
 
 
     def _enqueue_links(self, node: directed_graph.Node, links: dict) -> None:
-        base_url = get_url_base_path(node.url, include_path=False)
-        for item in links.values():
+
+
+        for key, item in links.items():
+            base_url = (
+                get_url_base_path(node.url, include_path=False)
+                if not key.startswith("ext_")
+                else get_url_base_path(node.url)
+            )  # Bill List next pages just attach query to path
             if not item:
                 continue
             if not isinstance(item, list):
                 item = [item]  # noqa: PLW2901
-            for it in item:
 
-                it = base_url + it
+            for it in item:
+                it = urljoin(base_url, it)
                 if it in self.state.nodes:
                     continue
                 url_type = get_url_base_path(it)
@@ -122,7 +147,10 @@ class CrawlerWorker(BaseWorker):
                 new_node = self.state.add_new_node(it, url_enum, [node],
                     state=PipelineStateEnum.AWAITING_FETCH,
                 )
-                self.input_queue.put(new_node)
+                if new_node:
+                    self.input_queue.put(new_node)
+        self.state.save_file(state_cache_file)
+
 
     def _parse_html(self, url: str, html: str) -> dict | None:
         parsed_url = get_url_base_path(url)
@@ -194,7 +222,8 @@ class ProcessorWorker(BaseWorker):
         # --- Attach state values after parse, parser not able to handle
         parsed_data, t_transformer = self.inject_session_code(parsed_data, t_transformer, node)
         transformed_data = self._transform_data(parsed_data, t_transformer)
-        transformed_data.update({"url": node.url})
+        if transformed_data:
+            transformed_data.update({"url": node.url})
         temptemplates = self._attach_state_values(node, transformed_data, t_transformer, state_pairs)
         if temptemplates is None:
             return
@@ -238,10 +267,19 @@ class ProcessorWorker(BaseWorker):
     ) -> dict | None:
         for key in state_pairs:
             state_dict = state_pairs[key][0](node, self.state, parsed_data)
+            if state_dict == 0:
+                continue
             if not state_dict:
                 #Wait for node data to be loaded
                 node.set_state(PipelineStateEnum.AWAITING_PROCESSING)
+                logger.info(f"[{self.name.upper()}]: Waiting for state transformer dependancies"
+                            f" to process for key {key}:\n"
+                            f"parsed_data: {parsed_data}\n"
+                            f"state_dict: {state_dict}\n")
+                # TODO: implement a scheduler or another mechanism to stop the thread from repeatedly trying to process a node waiting on dependent nodes
+                time.sleep(3)
                 self.input_queue.put(node)
+
                 return None
             parsed_data.update(state_dict)
             t_transformer.update(state_dict)
@@ -312,23 +350,24 @@ class LoaderWorker(BaseWorker):
             else:
                 node.data = None
             self._set_state(node, PipelineStateEnum.COMPLETED)
-            self._remove_nodes(node)
-            self.state.save_file(state_cache_file)
+            with self.state.lock:
+                self._remove_nodes(node)
+                # TODO: Fix load from save
+                self.state.save_file(state_cache_file)
             logger.info(f"[{self.name.upper()}]: Finished processing item: {item} "
                         f"with result: {result}")
         except Exception as e:
             self.db_conn.rollback()
             node.state = PipelineStateEnum.ERROR
-            logger.warning(f"Uncaught exception in loader worker: {e}")
+            logger.warning(f"Uncaught exception in loader worker with node {item}: {e}")
             raise
         finally:
             self.db_conn.commit()
 
     def _remove_nodes(self, node: directed_graph.Node):
-        self.state.safe_remove_root(node.url)
+        self.state.safe_remove_root(node.url, known_links_cache_file)
 
     def _load_item(self, item: directed_graph.Node) -> dict:
         page_enum = item.type
         loader_fun = self.fun_registry.get_processor(page_enum, PipelineRegistries.LOAD)
-        print(f"DEBUG LOADER FUN: {loader_fun}")
         return loader_fun.execute(item.data, self.db_conn)

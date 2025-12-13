@@ -2,7 +2,7 @@
 
 import html
 
-from src.config.settings import config
+from src.config.settings import project_config
 from src.utils.logger import logger
 
 
@@ -11,7 +11,7 @@ class PipelineTransformer:
 
     def __init__(self, *, strict: bool | None = None) -> None:
         """Initialize the transformer with strict flag."""
-        self.strict: bool = config["strict"] if strict is None else strict
+        self.strict: bool = project_config["strict"] if strict is None else strict
 
     def transform_content(self, template: dict, content: dict, *, strict: bool = False) -> dict:
         self.strict = strict # Assuming 'self.strict' is used elsewhere
@@ -37,7 +37,7 @@ class PipelineTransformer:
 
             # 💡 FIX START: Correctly handle unescaping for collections and scalars
 
-            if isinstance(value, (list, set)):
+            if isinstance(value, (list, set)) and len(value) > 0:
                 # If it's a list or set, iterate and unescape each item that is string-like
                 new_value = type(value)(
                     html.unescape(str(v)) if isinstance(v, (str, bytes)) else v
@@ -49,8 +49,6 @@ class PipelineTransformer:
             else:
                 new_value = value
 
-            # 💡 FIX END
-
             transform_func = template[key]
 
             if not callable(transform_func):
@@ -60,7 +58,7 @@ class PipelineTransformer:
                 raise TypeError(msg)
 
             try:
-                # ... (rest of the try block remains the same) ...
+
                 transformed_val = transform_func(new_value, strict=strict)
                 if isinstance(transformed_val, dict):
                     transformed_content.update(transformed_val)

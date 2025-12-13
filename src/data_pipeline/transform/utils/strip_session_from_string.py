@@ -1,7 +1,7 @@
 from urllib.parse import unquote
 
 
-def strip_session_from_link(link: str, *, strict: bool = False) -> str:
+def strip_session_from_link(link: str, *, strict: bool = False, getSession: bool=True) -> str:
     search_str1 = "&ddBienniumSession="
     search_str2 = "?ddBienniumSession="
     search_strs = [search_str1, search_str2]
@@ -12,5 +12,6 @@ def strip_session_from_link(link: str, *, strict: bool = False) -> str:
         links = link.rsplit(search_str2, 1)
         return links[1]
     links = link.rsplit(search_str1, 1) #rear split
-
-    return links[1]
+    if getSession:
+        return links[1]
+    return links[0]

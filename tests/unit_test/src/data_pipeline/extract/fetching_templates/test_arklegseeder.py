@@ -28,6 +28,6 @@ class TestArklegseederFetchSelector:
 
         assert result is not None
         assert result["legislator_list"] == ["/Legislators/List?ddBienniumSession=2013%2F2013R"]
-        assert result["bill_section"] == ["/Bills?ddBienniumSession=2013%2F2013R"]
+        assert result["bill_section"] == ["/Bills/SearchByRange?ddBienniumSession=2013%2F2013R"]
         assert result["committees_cat"] == ["/Committees?ddBienniumSession=2013%2F2013R"]
 

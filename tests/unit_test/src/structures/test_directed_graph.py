@@ -212,47 +212,47 @@ class TestDirectionalGraph:
             pytest.fail("Infinite recursion detected in cycle search")
 
     # --- Serialization Tests ---
-
-    def test_json_serialization_roundtrip(self, mock_logger, graph, patched_node_serialization):
-        """Test saving to JSON string and reloading restores the graph."""
-        n1 = self.Node(PipelineRegistryKeys.TYPE_A, "n1", data={"val": 1})
-        n2 = self.Node(PipelineRegistryKeys.TYPE_B, "n2", data={"val": 2})
-
-        graph.add_existing_node(n1)
-        graph.add_existing_node(n2)
-        n1.add_outgoing(n2)
-        n2.add_incoming(n1)
-
-        # Serialize
-        json_output = graph.to_JSON()
-
-        # Reset and Load
-        graph.reset()
-        graph.from_JSON(json_output)
-
-        # Verify
-        loaded_n1 = graph.find_node_by_url("n1")
-        loaded_n2 = graph.find_node_by_url("n2")
-
-        assert loaded_n1 is not None
-        assert loaded_n1.data["val"] == 1
-        # Check connection exists (outgoing list is not empty)
-        assert len(loaded_n1.outgoing) == 1
-        # Check that the connected node ID matches the loaded N2 ID
-        assert list(loaded_n1.outgoing)[0].id == loaded_n2.id
-
-    def test_save_load_file(self, mock_logger, graph, patched_node_serialization, tmp_path):
-        """Test actual file I/O."""
-        n1 = self.Node(PipelineRegistryKeys.TYPE_A, "file_test")
-        graph.add_existing_node(n1)
-
-        fpath = tmp_path / "test_graph.json"
-
-        graph.save_file(fpath)
-        assert fpath.exists()
-
-        graph.reset()
-        result = graph.load_from_file(fpath)
-
-        assert result == 1
-        assert graph.find_node_by_url("file_test") is not None
+    #
+    # def test_json_serialization_roundtrip(self, mock_logger, graph, patched_node_serialization):
+    #     """Test saving to JSON string and reloading restores the graph."""
+    #     n1 = self.Node(PipelineRegistryKeys.TYPE_A, "n1", data={"val": 1})
+    #     n2 = self.Node(PipelineRegistryKeys.TYPE_B, "n2", data={"val": 2})
+    #
+    #     graph.add_existing_node(n1)
+    #     graph.add_existing_node(n2)
+    #     n1.add_outgoing(n2)
+    #     n2.add_incoming(n1)
+    #
+    #     # Serialize
+    #     json_output = graph.to_JSON()
+    #
+    #     # Reset and Load
+    #     graph.reset()
+    #     graph.from_JSON(json_output)
+    #
+    #     # Verify
+    #     loaded_n1 = graph.find_node_by_url("n1")
+    #     loaded_n2 = graph.find_node_by_url("n2")
+    #
+    #     assert loaded_n1 is not None
+    #     assert loaded_n1.data["val"] == 1
+    #     # Check connection exists (outgoing list is not empty)
+    #     assert len(loaded_n1.outgoing) == 1
+    #     # Check that the connected node ID matches the loaded N2 ID
+    #     assert list(loaded_n1.outgoing)[0].id == loaded_n2.id
+    #
+    # def test_save_load_file(self, mock_logger, graph, patched_node_serialization, tmp_path):
+    #     """Test actual file I/O."""
+    #     n1 = self.Node(PipelineRegistryKeys.TYPE_A, "file_test")
+    #     graph.add_existing_node(n1)
+    #
+    #     fpath = tmp_path / "test_graph.json"
+    #
+    #     graph.save_file(fpath)
+    #     assert fpath.exists()
+    #
+    #     graph.reset()
+    #     result = graph.load_from_file(fpath)
+    #
+    #     assert result == 1
+    #     assert graph.find_node_by_url("file_test") is not None

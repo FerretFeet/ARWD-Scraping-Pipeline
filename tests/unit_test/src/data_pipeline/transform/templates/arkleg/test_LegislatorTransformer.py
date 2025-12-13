@@ -110,8 +110,8 @@ input_val = {
 
 output_val = {
     "party": "r",
-    "f_name": "cecile",
-    "l_name": "bledsoe",
+    "first_name": "cecile",
+    "last_name": "bledsoe",
     "chamber": "senate",
     "phone": None,
     "email": None,

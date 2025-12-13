@@ -5,11 +5,14 @@ import re
 
 from bs4 import BeautifulSoup
 
+from src.data_pipeline.load.download_pdf import downloadPDF
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
+from src.data_pipeline.transform.utils.strip_session_from_string import strip_session_from_link
 from src.data_pipeline.transform.utils.transform_str_to_date import transform_str_to_date
 from src.models.selector_template import SelectorTemplate
 from src.structures.directed_graph import Node
+from src.utils.strings.get_url_base_path import get_url_base_path
 
 
 class BillSelector(SelectorTemplate):
@@ -26,6 +29,7 @@ class BillSelector(SelectorTemplate):
                         normalize_str(bill_no, strict=strict, remove_substr="PDF")
                     ),
                 ),
+                "bill_no_dwnld": (_BillParsers.parse_bill_no_dwnld, empty_transform),
                 "act_no": (
                     _BillParsers.parse_act_no,
                     lambda bill_no, *, strict: (
@@ -42,8 +46,10 @@ class BillSelector(SelectorTemplate):
                 "cosponsors": (_BillParsers.parse_cosponsors, empty_transform),
                 "intro_date": (_BillParsers.parse_intro_date, transform_str_to_date),
                 "act_date": (_BillParsers.parse_act_date, transform_str_to_date),
-                "bill_documents": (_BillParsers.parse_other_bill_documents,
-                                   _BillTransformers.transform_bill_documents),
+                "bill_documents": (
+                    _BillParsers.parse_other_bill_documents,
+                    _BillTransformers.transform_bill_documents,
+                ),
                 "state_primary_sponsor": (
                     self.primary_sponsor_lookup,
                     empty_transform,
@@ -56,8 +62,41 @@ class BillSelector(SelectorTemplate):
                     self.other_primary_sponsor_lookup,
                     empty_transform,
                 ),
+                "state_download_pdfs": (self.download_doc_pdfs, empty_transform),
             },
         )
+    def download_doc_pdfs(self, node: Node, state_tree, parsed_data: dict):
+        """
+        Side effect - download the pdf files, replace urls with local paths.
+
+        Created here because it seemed like the easiest place to insert it with the architecture.
+        """
+        bill_no = parsed_data.get("bill_no") #hb1001
+        base_url = get_url_base_path(node.url, include_path=False)
+        if not bill_no: return None
+        session_code = strip_session_from_link(node.url).replace("/", "_")
+        category = re.match(r"^([a-zA-Z]+)", bill_no)
+        if category:
+            category = category.group(1) #hb, sb, hjr, sjr
+
+        targets: dict[str, list[str]] = parsed_data.get("bill_documents")
+        if not targets:
+            return None
+        for key, val in targets.items():
+            newbillno = bill_no + "_" + key
+            newpaths = []
+            nval = val
+            if not isinstance(val, list):
+                nval = [val]
+            for idx, v in enumerate(nval):
+                lpath = downloadPDF(session_code + "/" + category, newbillno,
+                                    base_url + v + "_" + str(idx)) if v else None
+                newpaths.append(str(lpath))
+            parsed_data["bill_documents"][key] = newpaths
+        return 0
+
+
+
 
     def state_sponsor_lookup(self, node: Node, state_tree, parsed_data, pdkey):
         urls = parsed_data.get(pdkey)
@@ -82,7 +121,9 @@ class BillSelector(SelectorTemplate):
             if found_node:
                 returndict.setdefault(rkey, []).append(found_node.data[rkey])
             else:
-                return None
+                #find closest match
+                # sometimes links dont go to the right page
+                returndict.setdefault(rkey, []).append(None)
 
         return {pdkey: returndict}
 
@@ -102,9 +143,12 @@ class _BillTransformers:
         returndict = {}
         for key, val in dinput.items():
             nkey = key.lower()
-            nval = [normalize_str(v) for v in val]
+            nval = [v.strip() for v in val
+                    if v]
             returndict.update({nkey: nval})
         return {"bill_documents": returndict}
+
+
     @staticmethod
     def normalize_bill_doc_type(billdoc: str) -> str:
         if billdoc == "amendments":
@@ -118,7 +162,6 @@ class _BillParsers:
     @staticmethod
     def parse_other_bill_documents(soup: BeautifulSoup) -> dict[str, dict[str, list[str]]] | None:
         bill_documents = soup.find_all("a", attrs={"aria-label": "Download PDF"})
-        if not bill_documents: return None
         result = {}
         for doc in bill_documents:
             label = doc.find_previous("h3")
@@ -211,7 +254,7 @@ class _BillParsers:
     def parse_act_no(soup: BeautifulSoup) -> str | None:
         label = "Act Number"
         result = _BillParsers._parse_bill_detail_table(soup, label, "text")
-        return result[2]
+        return result[2] if result else None
 
     @staticmethod
     def parse_act_no_dwnld(soup: BeautifulSoup) -> list[str] | None:

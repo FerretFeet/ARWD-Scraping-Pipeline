@@ -34,10 +34,9 @@ class BillVoteSelector(SelectorTemplate):
                     _VoteListParsers.parse_excused_names,
                     empty_transform,
                 ),
+                "motion_text": ("div#NonExistantDiv", empty_transform),
                 "state_bill_id": (
-                    lambda node, state_tree, parsed_data: self.get_dynamic_state_from_parents(
-                        node, state_tree, {"bill_id": None}, None,
-                    ).data,
+                    self.bill_id_lookup,
                     empty_transform,
                 ),
                 "state_yea_voter_lookup": (self.yea_lookup, empty_transform),
@@ -48,7 +47,17 @@ class BillVoteSelector(SelectorTemplate):
             },
         )
 
-    def state_vote_lookup(self, node: Node, state_tree, parsed_data, pdkey):
+    def bill_id_lookup(self, node, state, parsed_data):
+        found_node = self.get_dynamic_state_from_parents(node, state, {"bill_id": None}, None)
+        if found_node:
+            return {"bill_id": found_node.data.get("bill_id")}
+        bill_id = next(iter(node.incoming)).data.get("bill_id")
+        if bill_id:
+            return {"bill_id": bill_id}
+        return None
+
+
+    def state_vote_lookup(self, node: Node, state, parsed_data, pdkey):
         urls = parsed_data.get(pdkey)
         if not urls:
             return {pdkey: {}}
@@ -59,7 +68,7 @@ class BillVoteSelector(SelectorTemplate):
 
             found_node = self.get_dynamic_state(
                 node,
-                state_tree,
+                state,
                 {rkey: None},
                 {"url": html.unescape(url)},
             )
@@ -69,20 +78,20 @@ class BillVoteSelector(SelectorTemplate):
                 return None
         return {pdkey: {pdkey: returnlist}}
 
-    def yea_lookup(self, node, state_tree, parsed_data):
-        return self.state_vote_lookup(node, state_tree, parsed_data, "yea_voters")
+    def yea_lookup(self, node, state, parsed_data):
+        return self.state_vote_lookup(node, state, parsed_data, "yea_voters")
 
-    def nay_lookup(self, node, state_tree, parsed_data):
-        return self.state_vote_lookup(node, state_tree, parsed_data, "nay_voters")
+    def nay_lookup(self, node, state, parsed_data):
+        return self.state_vote_lookup(node, state, parsed_data, "nay_voters")
 
-    def nonvoting_lookup(self, node, state_tree, parsed_data):
-        return self.state_vote_lookup(node, state_tree, parsed_data, "non_voting_voters")
+    def nonvoting_lookup(self, node, state, parsed_data):
+        return self.state_vote_lookup(node, state, parsed_data, "non_voting_voters")
 
-    def present_lookup(self, node, state_tree, parsed_data):
-        return self.state_vote_lookup(node, state_tree, parsed_data, "present_voters")
+    def present_lookup(self, node, state, parsed_data):
+        return self.state_vote_lookup(node, state, parsed_data, "present_voters")
 
-    def excused_lookup(self, node, state_tree, parsed_data):
-        return self.state_vote_lookup(node, state_tree, parsed_data, "excused_voters")
+    def excused_lookup(self, node, state, parsed_data):
+        return self.state_vote_lookup(node, state, parsed_data, "excused_voters")
 
 
 class _VoteListTransformers:

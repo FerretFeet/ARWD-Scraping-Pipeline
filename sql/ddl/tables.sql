@@ -1,7 +1,7 @@
 
 CREATE TABLE IF NOT EXISTS sessions (
     session_code VARCHAR(20) PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL,
+    session_name TEXT NOT NULL,
     start_date DATE NOT NULL
 );
 
@@ -51,10 +51,21 @@ CREATE TABLE IF NOT EXISTS legislator_history (
 );
 
 CREATE TABLE IF NOT EXISTS committees (
-    committee_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name TEXT UNIQUE NOT NULL,
-    url TEXT
+    committee_id INT NOT NULL PRIMARY KEY
 );
+
+CREATE TABLE IF NOT EXISTS committee_info (
+    committee_info_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    fk_committee_id INT,
+    committee_name TEXT NOT NULL,
+    url TEXT,
+    start_date DATE,
+    end_date DATE,
+    FOREIGN KEY (fk_committee_id) REFERENCES committees(committee_id),
+    CONSTRAINT chk_dates CHECK (end_date IS NULL OR end_date >= start_date),
+    UNIQUE (fk_committee_id, committee_name, url, start_date)
+);
+
 
 CREATE TABLE IF NOT EXISTS committee_membership (
     committee_membership_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

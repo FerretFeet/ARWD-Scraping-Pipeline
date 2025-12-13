@@ -119,18 +119,25 @@ class Orchestrator:
         start_queue = ordered_queues[0]
 
         # PHASE 1: DYNAMIC SCHEDULING (Runs until no seeds are left)
+        # print(f"STATE ROOTS {self.state.get_roots()}")
+
         while any(urls for urls in self.seed_urls.values()):
             # 1. Inject next seed URL if a slot is free
-            active_root_netlocs = {parse_url(node.url).netloc for node in self.state.roots}
+            active_root_netlocs = {parse_url(node.url).netloc for node in self.state.get_roots()
+                                   if isinstance(node, directed_graph.Node)}
 
             for key in list(self.seed_urls.keys()):
                 domain_netloc = parse_url(key).netloc
                 if domain_netloc not in active_root_netlocs:
                     next_url = self._next_seed(key)
                     if next_url:
+                        logger.info(f"[ORCHESTRATOR]: ADD NEW SEED: {next_url}")
                         self._enqueue_links(next_url, start_queue)
             # Yield control to workers to process scheduled items
             time.sleep(0.001)
+            # Ensure all workers are still active, else begin shutdown
+            for worker in workers:
+                if not worker.is_alive(): break
 
             # PHASE 2: PIPELINE CLEARANCE (Block until all work is done)
         # The loop above is finished. All seeds have been scheduled.
@@ -228,8 +235,21 @@ class Orchestrator:
         """Put starting values in queues."""
         root_items = {}
         root_queue = self.queues[PipelineRegistries.FETCH]
+        process_queue = self.queues[PipelineRegistries.PROCESS]
+        loader_queue = self.queues[PipelineRegistries.LOAD]
         if unvisited_nodes:
-            self._enqueue_links(unvisited_nodes, root_queue)
+            for node in unvisited_nodes:
+                if not node.incoming:
+                    self.state.roots.add(node)
+                if node.state in [PipelineStateEnum.CREATED, PipelineStateEnum.AWAITING_FETCH,
+                                  PipelineStateEnum.FETCHING]:
+                    root_queue.put(node)
+                elif node.state in [PipelineStateEnum.AWAITING_PROCESSING, PipelineStateEnum.PROCESSING]:
+                    process_queue.put(node)
+                elif node.state in [PipelineStateEnum.AWAITING_LOAD, PipelineStateEnum.LOADING]:
+                    loader_queue.put(node)
+
+
 
 
 
@@ -286,10 +306,6 @@ class Orchestrator:
 
         if self.state.load_from_file(cache_base_path):
             nodes_to_stack = self.state.nodes
-            for node in nodes_to_stack.values():
-                if node.url not in addtl_keys:
-                    addtl_keys.append(node.url)
-                    self.state.roots.add(node)
 
         for key, urllist in seed_urls.copy().items():
             if (key not in nodes_to_stack
@@ -300,7 +316,8 @@ class Orchestrator:
                 new_node = self.state.add_new_node(url, urlenum, None)
                 addtl_nodes.append(new_node)
                 addtl_keys.append(key)
-                self.state.roots.add(new_node)
+                if new_node:
+                    self.state.roots.add(new_node)
 
         return [item for items in zip_longest(nodes_to_stack.values(), addtl_nodes)
                              for item in items if item is not None]

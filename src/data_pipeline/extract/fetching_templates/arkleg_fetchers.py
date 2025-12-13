@@ -42,7 +42,8 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
     def parse_bill_section(soup: BeautifulSoup) -> list[str] | None:
         """Select bills section links."""
         a = soup.find("a", attrs={"id": "dropdownMenuBills"})
-        return a.get("href")
+        new_a = a.find_next("a")
+        return new_a.get("href")
 
 
 
@@ -78,7 +79,7 @@ class BillListLinkSelector(SelectorTemplate):
         super().__init__(
             selectors={
                 "bill": ("div.measureTitle b a", "href"),
-                "bill_list": ("div.tableSectionFooter div b + a", "href"),
+                "ext_bill_list": ("div.tableSectionFooter div b + a", "href"),
             },
         )
 
@@ -97,7 +98,8 @@ class BillLinkSelector(SelectorTemplate):
     @staticmethod
     def parse_vote_links(soup: BeautifulSoup) -> list[str] | None:
         """Select vote page links."""
-        return soup.find_all("a", string=re.compile(r"vote", re.IGNORECASE))  # type: ignore  # noqa: PGH003
+        alist =  soup.find_all("a", string=re.compile(r"vote", re.IGNORECASE))  # type: ignore  # noqa: PGH003
+        return [a.get("href") for a in alist]
 
 
 class LegislatorListLinkSelector(SelectorTemplate):

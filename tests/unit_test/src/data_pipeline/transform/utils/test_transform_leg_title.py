@@ -14,8 +14,8 @@ class TestTransformTitles:
             (
                 "representative aaron pilkington (r)",
                 {
-                    "f_name": "aaron",
-                    "l_name": "pilkington",
+                    "first_name": "aaron",
+                    "last_name": "pilkington",
                     "chamber": "house",
                     "party": "r",
                 },
@@ -24,8 +24,8 @@ class TestTransformTitles:
             (
                 "senator john s. doe",
                 {
-                    "f_name": "john",
-                    "l_name": "s. doe",
+                    "first_name": "john",
+                    "last_name": "s. doe",
                     "chamber": "senate",
                     "party": None,
                 },
@@ -33,8 +33,8 @@ class TestTransformTitles:
             (
                 "john doe (r)",
                 {
-                    "f_name": "john",
-                    "l_name": "doe",
+                    "first_name": "john",
+                    "last_name": "doe",
                     "chamber": None,
                     "party": "r",
                 },
@@ -42,8 +42,8 @@ class TestTransformTitles:
             (
                 "john (r)",
                 {
-                    "f_name": None,
-                    "l_name": "john",
+                    "first_name": None,
+                    "last_name": "john",
                     "chamber": None,
                     "party": "r",
                 },

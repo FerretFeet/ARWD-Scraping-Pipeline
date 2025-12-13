@@ -1,15 +1,16 @@
 """Selector template for arkleg.state.ar.us/Legislators/Detail?."""
-
+import html
 import re
 
 from bs4 import BeautifulSoup
 
 from src.data_pipeline.transform.utils.cast_to_int import cast_to_int
-from src.data_pipeline.transform.utils.normalize_list_of_str_link import normalize_list_of_str_link
+from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.data_pipeline.transform.utils.transform_leg_title import transform_leg_title
 from src.data_pipeline.transform.utils.transform_phone import transform_phone
 from src.models.selector_template import SelectorTemplate
+from src.structures.directed_graph import DirectionalGraph, Node
 from src.utils.logger import logger
 
 
@@ -24,26 +25,43 @@ class LegislatorSelector(SelectorTemplate):
                 "phone": (_LegislatorParsers.parse_phone, transform_phone),
                 "email": (_LegislatorParsers.parse_email, normalize_str),
                 "address": ("h1 + p", normalize_str),
-                "district": (_LegislatorParsers.parse_district, cast_to_int),
+                "district": (_LegislatorParsers.parse_district, normalize_str),
                 "seniority": (_LegislatorParsers.parse_seniority, cast_to_int),
                 "public_service": (_LegislatorParsers.parse_public_service, normalize_str),
-                "committees": (
-                    _LegislatorParsers.get_committees_names_links,
-                    normalize_list_of_str_link,
+                "committee_ids": (
+                    _LegislatorParsers.get_committees_links,
+                    empty_transform,
                 ),
+                "state_committee_ids": (self.committee_ids_lookup, empty_transform),
             },
         )
+    def committee_ids_lookup(self, node: Node, state_tree: DirectionalGraph, parsed_data: dict)\
+            -> dict[str, list[str]]:
+        urls = parsed_data.get("committee_ids")
+        if not urls:
+            return {"committee_ids": []}
+        result = []
+        for url in urls:
+            found_node = self.get_dynamic_state(
+                node,
+                state_tree,
+                {"committee_id": None},
+                {"url": html.unescape(url)},
+
+            )
+            if found_node:
+                result.append(found_node.data.get("committee_id"))
+        return {"committee_ids": result}
 
 
 class _LegislatorParsers:
     @staticmethod
-    def get_committees_names_links(soup: BeautifulSoup) -> list[tuple[str, str]]:
+    def get_committees_links(soup: BeautifulSoup) -> list[str]:
         els = soup.select("div#meetingBodyWrapper a")
         result = []
         for el in els:
-            el_text = el.get_text(strip=True)
             el_link = el.get("href")
-            result.append((el_text, el_link))
+            result.append(el_link)
         return result
 
     @staticmethod

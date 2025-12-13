@@ -1,11 +1,15 @@
 """Web Crawler for requesting and parsing HTML content."""
+import os
 import time
 
+from dotenv import load_dotenv
 from requests import RequestException, Session
 
-from src.config.settings import config
+from src.config.settings import project_config
 from src.utils.logger import logger
+from src.utils.paths import project_root
 
+load_dotenv(project_root / ".env")
 
 class Crawler:
     """Web Crawler for requesting and parsing HTML content."""
@@ -14,19 +18,27 @@ class Crawler:
         retry_backoff: float = 0.5) -> None:
         """Initialize the Crawler with domain base-url and optional strict parameter."""
         self.site = site
-        self.strict = config["strict"] if strict is None else strict
-        self.session = Session()
+        self.strict = project_config["strict"] if strict is None else strict
+        self.session = self.create_session()
         self.session_counter = 0
 
         self.max_retries = max_retries
         self.retry_backoff = retry_backoff
+
+    def create_session(self):
+        session = Session()
+        session.headers.update({
+            "User-Agent": os.getenv("HTTP_HEADER_USER_AGENT"),
+            "From": os.getenv("HTTP_HEADER_FROM"),
+        })
+        return session
 
     def increment_session(self) -> None:
         """Reset the session after 100 requests."""
         self.session_counter += 1
         if self.session_counter % 100 == 0:
             self.session.close()
-            self.session = Session()
+            self.session = self.create_session()
 
     def get_page(self, url: str) -> str:
         """Fetch a URL with automatic retries and return HTML text."""

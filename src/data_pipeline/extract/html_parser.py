@@ -90,7 +90,8 @@ class HTMLParser:
                     # --- STRATEGY 2: Rule is a simple tuple or str---
                     if isinstance(val, tuple):
                         if len(val) == 1:
-                            selector = str(val[0])
+                        #FIXME Removed cast val[0] to str to test
+                            selector = val[0]
                         elif len(val) == 2:  # noqa: PLR2004
                             selector, attr = val
                         else:
@@ -102,5 +103,4 @@ class HTMLParser:
                     args = [selector] if attr is None else [selector, attr]
                     content_holder[key] = self.safe_get(soup, *args)
 
-        logger.info("\nCrawler executed and retrieved content")
         return content_holder

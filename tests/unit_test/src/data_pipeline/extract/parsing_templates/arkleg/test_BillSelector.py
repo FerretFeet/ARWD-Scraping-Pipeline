@@ -44,11 +44,24 @@ def fake_state():
     return state
 
 @pytest.fixture
-def mock_processor_worker(fake_state):
-    worker = ProcessorWorker(Queue(), Queue(), fake_state, HTMLParser(), PipelineTransformer(),
-                           PIPELINE_REGISTRY, strict=False)
-    return worker
+def mock_processor_worker(fake_state, mocker):
+    # 1. Patch the function at the location where the worker imports/uses it
+    #    You must replace 'your_project.workers.processor_worker'
+    #    with the actual Python import path to your worker file.
+    mocker.patch("src.data_pipeline.extract.parsing_templates.arkleg.bill_selector.downloadPDF", return_value="/example")
 
+    # 2. Then, initialize the worker instance
+    worker = ProcessorWorker(
+        Queue(),
+        Queue(),
+        fake_state,
+        HTMLParser(),
+        PipelineTransformer(),
+        PIPELINE_REGISTRY,
+        strict=False,
+    )
+
+    return worker
 
 
 @pytest.fixture(scope="session")
@@ -74,7 +87,7 @@ class TestArStateLegislatorSelector:
                                           node.data["html"], t_parser)
         parsed_data, t_transformer = mock_processor_worker.inject_session_code(parsed_data, t_transformer, node)
         result = mock_processor_worker._transform_data(parsed_data, t_transformer)  # noqa: SLF001
-        result = mock_processor_worker._attach_state_values(node, result, t_transformer, state_pairs)  # noqa: SLF001
+        result = mock_processor_worker._attach_state_values(node, result, t_transformer, state_pairs)
 
 
         assert result is not None
@@ -90,7 +103,7 @@ class TestArStateLegislatorSelector:
 
         assert result["intro_date"] == datetime.datetime(2025, 1, 13, 14, 39, 5, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
         assert result["act_date"] ==  datetime.datetime(2025, 1, 27, 0, 0, tzinfo=zoneinfo.ZoneInfo(key="America/Chicago"))
-        assert result["bill_documents"] == {"amendments": ["/home/ftpdocument?path=%2famend%2f2025r%2fpublic%2fhb1001-h1.pdf"],
-                                            "bill_text": ["/home/ftpdocument?path=%2fbills%2f2025r%2fpublic%2fhb1001.pdf"],
-                                            "act_text": ["/acts/ftpdocument?path=%2facts%2f2025r%2fpublic%2f&file=3.pdf&ddbienniumsession=2025%2f2025r"]}
+        assert result["bill_documents"] == {"amendments": ["/example"],
+                                            "bill_text": ["/example"],
+                                            "act_text": ["/example"]}
         assert result["session_code"] ==  "2019/2019R"

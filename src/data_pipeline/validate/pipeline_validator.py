@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ValidationError
 
-from src.config.settings import config
+from src.config.settings import project_config
 from src.utils.logger import logger
 
 
@@ -11,7 +11,7 @@ class PipelineValidator:
 
     def __init__(self, *, strict: bool | None = None) -> None:
         """Initialize the transformer with strict flag."""
-        self.strict: bool = config["strict"] if strict is None else strict
+        self.strict: bool = project_config["strict"] if strict is None else strict
 
     def validate(self, val_model: type[BaseModel], unval_content: dict) -> dict[str, ...]:
         """

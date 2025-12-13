@@ -26,14 +26,14 @@ def transform_leg_title(title: list[str] | str, *, strict: bool = False) -> dict
 
     result = {
         "party": _parse_party(title),
-        "f_name": (_parse_name(title))[0],
-        "l_name": (_parse_name(title))[1],
+        "first_name": (_parse_name(title))[0],
+        "last_name": (_parse_name(title))[1],
         "chamber": _parse_chamber(title),
     }
     return {
         "party": normalize_str(result["party"]) if result["party"] else None,
-        "f_name": normalize_str(result["f_name"]) if result["f_name"] else None,
-        "l_name": normalize_str(result["l_name"]) if result["l_name"] else None,
+        "first_name": normalize_str(result["first_name"]) if result["first_name"] else None,
+        "last_name": normalize_str(result["last_name"]) if result["last_name"] else None,
         "chamber": normalize_str(result["chamber"] if result["chamber"] else None),
     }
 

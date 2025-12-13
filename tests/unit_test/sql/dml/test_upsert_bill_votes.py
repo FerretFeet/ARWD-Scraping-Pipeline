@@ -9,12 +9,12 @@ from src.data_pipeline.load.pipeline_loader import PipelineLoader
 
 @pytest.fixture
 def sql_file():
-    return "dml/upsert_bill_votes.sql"
+    return "dml/functions/upsert_bill_votes.sql"
 
 @pytest.fixture
 def sql_file_path() -> Path:
     """Return the path to the upsert_bill_votes SQL file."""
-    return Path("sql/dml/upsert_bill_votes.sql")
+    return Path("sql/dml/functions/upsert_bill_votes.sql")
 
 
 @pytest.fixture(autouse=True)
@@ -29,7 +29,7 @@ def clean_tables(db):
 @pytest.fixture
 def setup_session(db):
     db.execute("""
-        INSERT INTO sessions (session_code, name, start_date)
+        INSERT INTO sessions (session_code, session_name, start_date)
         VALUES ('2025A', '2025 Session', '2025-01-01')
         ON CONFLICT (session_code) DO NOTHING
         RETURNING session_code;

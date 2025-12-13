@@ -12,6 +12,9 @@ from src.data_pipeline.extract.fetching_templates.arkleg_fetchers import (
 from src.data_pipeline.extract.parsing_templates.arkleg import parsing_templates
 from src.data_pipeline.extract.parsing_templates.arkleg.bill_selector import BillSelector
 from src.data_pipeline.extract.parsing_templates.arkleg.bill_vote_selector import BillVoteSelector
+from src.data_pipeline.extract.parsing_templates.arkleg.legislator_list_selector import (
+    LegislatorListSelector,
+)
 from src.data_pipeline.extract.parsing_templates.arkleg.legislator_selector import (
     LegislatorSelector,
 )
@@ -41,7 +44,8 @@ LOADER_CONFIG: dict = {
                p_bill_documents := %(p_bill_documents)s::jsonb,
                p_lead_sponsor := %(p_lead_sponsor)s::jsonb,
                p_other_primary_sponsor := %(p_other_primary_sponsor)s::jsonb,
-               p_cosponsors := %(p_cosponsors)s::jsonb);,
+               p_cosponsors := %(p_cosponsors)s::jsonb
+               ) AS bill_id;
         """,
     },
 
@@ -56,7 +60,7 @@ LOADER_CONFIG: dict = {
             SELECT upsert_bill_votes(
                 p_bill_id := %(p_bill_id)s,
                 p_vote_timestamp := %(p_vote_timestamp)s,
-                p_chamber := %(p_chamber)s,
+                p_chamber := %(p_chamber)s::chamber,
                 p_motion_text := %(p_motion_text)s,
                 p_yea_voters := %(p_yea_voters)s::JSONB,
                 p_nay_voters := %(p_nay_voters)s::JSONB,
@@ -79,19 +83,20 @@ LOADER_CONFIG: dict = {
         "name": "Upsert Legislator",
         "filepath": SQL_LOADER_BASE_PATH / "upsert_legislator.sql",
         "insert": """
-                SELECT upsert_legislator(
-               p_first_name := %(p_first_name)s,
-               p_last_name := %(p_last_name)s,
-               p_url := %(p_url)s,
-               p_phone := %(p_phone)s,
-               p_email := %(p_email)s,
-               p_address := %(p_address)s,
-               p_district := %(p_district)s,
-               p_seniority := %(p_seniority)s,
-               p_chamber := %(p_chamber)s,
-               p_party := %(p_party)s,
-               p_start_date := %(p_start_date)s,
-               p_committee_ids := %(p_committee_ids)s);
+            SELECT upsert_legislator(
+                p_first_name     := %(p_first_name)s::text,
+                p_last_name      := %(p_last_name)s::text,
+                p_url            := %(p_url)s::text,
+                p_phone          := %(p_phone)s::text,
+                p_email          := %(p_email)s::text,
+                p_address        := %(p_address)s::text,
+                p_district       := %(p_district)s::text,
+                p_seniority      := %(p_seniority)s::smallint,
+                p_chamber        := %(p_chamber)s::chamber,
+                p_party          := %(p_party)s::text,
+                p_session_code   := %(p_session_code)s::text,
+                p_committee_ids  := %(p_committee_ids)s::int[]
+                ) AS legislator_id;
         """,
     },
     PipelineRegistryKeys.COMMITTEE: {
@@ -101,10 +106,25 @@ LOADER_CONFIG: dict = {
         "name": "Upsert Committee",
         "filepath": SQL_LOADER_BASE_PATH / "upsert_committee.sql",
         "insert": """
-    SELECT upsert_committee(
-        %(p_name)s::TEXT,
-        %(p_url)s::TEXT
-    );
+            SELECT upsert_committee(
+                p_committee_id := %(p_committee_id)s::int,
+                p_name         := %(p_name)s::text,
+                p_url          := %(p_url)s::text,
+                p_session_code := %(p_session_code)s::text
+            ) AS committee_id;
+""",
+    },
+    PipelineRegistryKeys.LEGISLATOR_LIST: {
+        "params": {
+            "active_urls",
+        },
+        "name": "Close nonpresent legislators",
+        "filepath": SQL_LOADER_BASE_PATH / "upsert_committee.sql",
+        "insert": """
+            SELECT close_missing_legislators(
+                p_active_urls  := %(p_active_urls)s::text[],
+                p_session_code := %(p_session_code)s::text
+            );
 """,
     },
 }
@@ -132,6 +152,7 @@ PROCESSOR_CONFIG: dict = {
     },
     PipelineRegistryKeys.LEGISLATOR_LIST: {
         PipelineRegistries.FETCH: LegislatorListLinkSelector,
+        PipelineRegistries.PROCESS: LegislatorListSelector,
     },
     PipelineRegistryKeys.LEGISLATOR: {
         PipelineRegistries.PROCESS: LegislatorSelector,

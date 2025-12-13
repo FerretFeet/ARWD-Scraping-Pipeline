@@ -123,7 +123,7 @@ LEGISLATOR_FIXTURE_PARAMS = [
     ),
     (
         "legislator/legislator",
-        "https://arkleg.state.ar.us/Legislators/Detail?member=Bledsoe&ddBienniumSession=2017%2F2017R",
+        "https://arkleg.state.ar.us/Legislators/Detail?member=J.+Boyd&ddBienniumSession=2025%2F2025R",
         "known",
     ),
 ]

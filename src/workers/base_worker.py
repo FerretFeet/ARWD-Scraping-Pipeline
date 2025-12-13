@@ -19,7 +19,7 @@ class BaseWorker(threading.Thread):
             return None
         return item
 
-    def mark_done(self, item):
+    def mark_done(self):
         self.input_queue.task_done()
 
     def run(self):
@@ -31,7 +31,7 @@ class BaseWorker(threading.Thread):
                     self.output_queue.put(item)
                 break
             if getattr(item, "state", None) == PipelineStateEnum.ERROR:
-                self.mark_done(item)
+                self.mark_done()
                 continue
             try:
                 self.process(item)
@@ -40,7 +40,7 @@ class BaseWorker(threading.Thread):
                 logger.warning(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {e}")
                 self.handle_error(item, e)
             finally:
-                self.mark_done(item)
+                self.mark_done()
 
     def process(self, item):
         raise NotImplementedError
@@ -48,9 +48,8 @@ class BaseWorker(threading.Thread):
     def handle_error(self, item, error):
         # optional logging or state update
         self._set_state(item, PipelineStateEnum.ERROR)
-        logger.warning(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {error}")
-        logger.error(f"Uncaught processing error: {error}")
-
+        logger.exception(f"[{self.name.upper()}]: Exception while processing item: {item}\t")
+        self.input_queue.put(None)
 
     def _set_state(self, node: directed_graph.Node, state: PipelineStateEnum) -> None:
         node.set_state(state)

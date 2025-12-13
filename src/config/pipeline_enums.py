@@ -8,7 +8,7 @@ class PipelineRegistryKeys(Enum):
     COMMITTEES_CAT = "arkleg.state.ar.us/Committees"
     COMMITTEES_LIST = "arkleg.state.ar.us/Committees/List"
     COMMITTEE = "arkleg.state.ar.us/Committees/Detail"
-    ARK_LEG_SEEDER = "arkleg.state.ar.us/"
+    ARK_LEG_SEEDER = "arkleg.state.ar.us"
     LEGISLATOR_LIST = "arkleg.state.ar.us/Legislators/List"
     LEGISLATOR = "arkleg.state.ar.us/Legislators/Detail"
     BILLS_SECTION = "arkleg.state.ar.us/Bills"
