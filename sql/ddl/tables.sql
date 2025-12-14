@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS bills (
     title TEXT NOT NULL,
     url TEXT NOT NULL,
     fk_session_code VARCHAR(20) NOT NULL,
-    intro_date DATE NOT NULL,
+    intro_date TIMESTAMP NOT NULL,
     act_date DATE,
     FOREIGN KEY (fk_session_code) REFERENCES sessions(session_code),
     UNIQUE(bill_no, fk_session_code)
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS bill_documents (
     fk_bill_id INT NOT NULL,
     document_type VARCHAR(40) NOT NULL,
     url TEXT NOT NULL,
-    doc_date DATE,
+    doc_date TIMESTAMP,
     FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id)
 );
 
@@ -113,6 +113,18 @@ CREATE TABLE IF NOT EXISTS legislator_votes (
     FOREIGN KEY (fk_vote_event_id) REFERENCES vote_events(vote_event_id),
     FOREIGN KEY (fk_legislator_id) REFERENCES legislators(legislator_id),
     UNIQUE (fk_vote_event_id, fk_legislator_id)
+);
+
+CREATE TABLE IF NOT EXISTS bill_status_history (
+    bill_status_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    fk_bill_id INT NOT NULL,
+    chamber chamber,
+    status_date TIMESTAMP,
+    history_action TEXT,
+    fk_vote_event_id INT,
+    vote_action_present BOOLEAN NOT NULL,
+    FOREIGN KEY (fk_bill_id) REFERENCES legislators(legislator_id),
+    FOREIGN KEY (fk_vote_event_id) REFERENCES vote_events(vote_event_id)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_legislators_name ON legislators (first_name, last_name);

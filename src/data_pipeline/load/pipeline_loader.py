@@ -30,12 +30,14 @@ class PipelineLoader:
         prefixed_params = {f"p_{key}": value for key, value in params.items()}
 
         for k, v in prefixed_params.items():
-            if k == "url":
+            if k == "p_url":
                 v = strip_session_from_link(v, getSession=False)
             if isinstance(v, dict):
                 prefixed_params[k] = json.dumps(v) if v else None
             elif isinstance(v, datetime.datetime):
                 prefixed_params[k] = v.isoformat()
+            else:
+                prefixed_params[k] = v
         sql = self.sql_template
         if isinstance(db_conn, psycopg.Connection):
             with db_conn.cursor(row_factory=rows.dict_row) as cur:

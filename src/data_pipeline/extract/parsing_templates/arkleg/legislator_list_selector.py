@@ -1,4 +1,6 @@
 """Selector template for Arkleg.state.ar.us/Legislators/List."""
+import html
+
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.strip_session_from_string import strip_session_from_link
 from src.models.selector_template import SelectorTemplate
@@ -21,5 +23,5 @@ class LegislatorListSelector(SelectorTemplate):
 
     def strip_all_session_from_links(self, linklist: list[str], *, strict:bool = False) -> list[str]:
         """Strip all sessions from linklist."""
-        return [strip_session_from_link(link, getSession=False) for link in linklist]
+        return [strip_session_from_link(html.unescape(link), getSession=False) for link in linklist]
 

@@ -21,7 +21,7 @@ class ArkLegSeederLinkSelector(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "bill_section": self.parse_bill_section,
+                # "bill_section": self.parse_bill_section,
                 "legislator_list": self.parse_legislator_list,
                 "committees_cat": self.parse_committee_cats,
             },

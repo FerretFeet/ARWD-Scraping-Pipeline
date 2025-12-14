@@ -3,12 +3,13 @@ CREATE OR REPLACE FUNCTION upsert_bill_with_sponsors(
     p_bill_no VARCHAR,
     p_url TEXT,
     p_session_code VARCHAR,
-    p_intro_date DATE,
+    p_intro_date TIMESTAMP,
     p_act_date DATE,
     p_bill_documents JSONB,          -- {"amendments":[...], "bill_text":[...], "act_text":[...]}
     p_lead_sponsor JSONB,            -- {"committee_id":[1]} OR {"legislator_id":[...]}
     p_other_primary_sponsor JSONB,   -- {"legislator_id":[...], "committee_id":[...]}
-    p_cosponsors JSONB               -- {"legislator_id":[...]} OR {"committee_id":[...]}
+    p_cosponsors JSONB,               -- {"legislator_id":[...]} OR {"committee_id":[...]}
+    p_bill_status_history JSONB[]            -- [{"chamber":"", "history_action":"","status_date":DatetimeObj, "vote_action_present":"T/F"}]
 ) RETURNS INT AS $$
 DECLARE
     v_bill_id INT;
@@ -17,6 +18,7 @@ DECLARE
     v_doc_url TEXT;
     v_leg_id INT;
     v_comm_id INT;
+  v_status JSONB;
 BEGIN
     -- 1) Find existing bill
     SELECT bill_id INTO v_existing_bill_id
@@ -58,6 +60,37 @@ BEGIN
             VALUES (v_bill_id, v_doc_type, v_doc_url);
         END IF;
     END LOOP;
+
+    -- 3) Insert bill status history
+    IF p_bill_status_history IS NOT NULL THEN
+        FOREACH v_status IN ARRAY p_bill_status_history LOOP
+            -- Extract fields from JSONB object
+            INSERT INTO bill_status_history(
+                fk_bill_id,
+                chamber,
+                status_date,
+                history_action,
+                vote_action_present,
+                vote_action
+            )
+            SELECT
+                v_bill_id,
+                v_status->>'chamber'::chamber,
+                (v_status->>'status_date')::DATE,
+                v_status->>'history_action',
+                (v_status->>'vote_action_present')::BOOLEAN,
+                NULLIF(v_status->>'vote_action','')::INT
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM bill_status_history
+                WHERE fk_bill_id = v_bill_id
+                  AND chamber = v_status->>'chamber'::chamber
+                  AND status_date = (v_status->>'status_date')::DATE
+                  AND history_action = v_status->>'history_action'
+            );
+        END LOOP;
+    END IF;
+
 
     -- Helper function for inserting sponsors
     -- Type TEXT: 'lead', 'primary', 'cosponsor'

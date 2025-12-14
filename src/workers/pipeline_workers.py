@@ -98,13 +98,14 @@ class CrawlerWorker(BaseWorker):
                 links: dict = self._parse_html(working_node.url, html)
                 if links:
                     self._enqueue_links(node, links)
-                if self._check_processing_step(working_node.url):
+                if links and self._check_processing_step(working_node.url): # No next step, dont send to queue
+                    self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
+                    node.data = links
+                elif self._check_processing_step(working_node.url):
                     working_node.data["html"] = html
                     self._set_state(working_node, PipelineStateEnum.AWAITING_PROCESSING)
                     self.output_queue.put(working_node)
-                else: # No next step, dont send to queue
-                    self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
-                    node.data = links
+
             except Exception as e:
                 logger.error(f"[{self.name.upper()}]: {e}")
                 self._set_state(working_node, PipelineStateEnum.ERROR)
@@ -349,7 +350,10 @@ class LoaderWorker(BaseWorker):
                 node.data = result
             else:
                 node.data = None
-            self._set_state(node, PipelineStateEnum.COMPLETED)
+            if any(cn.state for cn in node.outgoing) != PipelineStateEnum.COMPLETED:
+                self._set_state(node, PipelineStateEnum.AWAITING_CHILDREN)
+            else:
+                self._set_state(node, PipelineStateEnum.COMPLETED)
             with self.state.lock:
                 self._remove_nodes(node)
                 # TODO: Fix load from save

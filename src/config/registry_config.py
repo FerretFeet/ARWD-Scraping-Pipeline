@@ -44,7 +44,8 @@ LOADER_CONFIG: dict = {
                p_bill_documents := %(p_bill_documents)s::jsonb,
                p_lead_sponsor := %(p_lead_sponsor)s::jsonb,
                p_other_primary_sponsor := %(p_other_primary_sponsor)s::jsonb,
-               p_cosponsors := %(p_cosponsors)s::jsonb
+               p_cosponsors := %(p_cosponsors)s::jsonb,
+               p_bill_status_history := %(p_bill_status_history)s::jsonb
                ) AS bill_id;
         """,
     },

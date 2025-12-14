@@ -146,7 +146,7 @@ class Node:
     def __repr__(self) -> str:
         """Represent Node as string."""
 
-        def _shorten(val, max_len=50):
+        def _shorten(val, max_len=250):
             """Return a truncated string representation if too long."""
             s = str(val)
             if len(s) > max_len:
