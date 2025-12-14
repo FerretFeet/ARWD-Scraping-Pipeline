@@ -2,6 +2,7 @@
 
 import html
 import re
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -87,13 +88,15 @@ class BillSelector(SelectorTemplate):
         for key, val in targets.items():
             newbillno = bill_no + "_" + key
             newbillno = normalize_str(newbillno).replace(" ", "_")
+
             newpaths = []
             nval = val
             if not isinstance(val, list):
                 nval = [val]
             for idx, v in enumerate(nval):
-                lpath = downloadPDF(session_code + "/" + category + "/" + newbillno, newbillno + "_" + str(idx),
-                                    v) if v else None
+                lpath = downloadPDF(session_code + "/" + category + "/" + bill_no,
+                                    newbillno + "_" + str(idx),
+                                    urljoin(base_url, v)) if v else None
                 newpaths.append(str(lpath))
             parsed_data["bill_documents"][key] = newpaths
         return 0
@@ -190,16 +193,16 @@ class _BillParsers:
         bill_status_header = soup.find("h3", string=re.compile("Bill Status History",
                                                                re.IGNORECASE))
         if not bill_status_header: return bill_status_history
-        bill_status_table = bill_status_header.find_next_sibling("div#tableDataWrapper")
+        bill_status_table = bill_status_header.find_next("div", id="tableDataWrapper")
         if not bill_status_table: return bill_status_history
-        bill_statuses = bill_status_table.find_all("row", class_=["tableRow", "tableRowAlt"])
+        bill_statuses = bill_status_table.find_all("div", class_=["tableRow", "tableRowAlt"])
         for row in bill_statuses:
             status = {}
             cells = row.find_all("div")
-            status.update({"chamber": cells[0].get_text() if cells[0] else None})
-            status.update({"status_date": cells[1].get_text() if cells[1] else None})
-            status.update({"history_action": cells[2].get_text() if cells[2] else None})
-            status.update({"vote_action_present": cells[3].get_text() if cells[3] else None})
+            status.update({"chamber": cells[0].get_text(strip=True) if cells[0] else None})
+            status.update({"status_date": cells[1].get_text(strip=True) if cells[1] else None})
+            status.update({"history_action": cells[2].get_text(strip=True) if cells[2] else None})
+            status.update({"vote_action_present": cells[3].get_text(strip=True) if cells[3] else None})
             bill_status_history.append(status)
 
         return bill_status_history

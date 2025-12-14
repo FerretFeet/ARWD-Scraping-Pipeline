@@ -107,3 +107,5 @@ class TestArStateLegislatorSelector:
                                             "bill_text": ["/example"],
                                             "act_text": ["/example"]}
         assert result["session_code"] ==  "2019/2019R"
+        assert result["bill_status_history"] == "sfd"
+        assert False

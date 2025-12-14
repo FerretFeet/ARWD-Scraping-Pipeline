@@ -71,12 +71,12 @@ BEGIN
                 status_date,
                 history_action,
                 vote_action_present,
-                vote_action
+                fk_vote_event_id
             )
             SELECT
                 v_bill_id,
-                v_status->>'chamber'::chamber,
-                (v_status->>'status_date')::DATE,
+                (v_status->>'chamber')::chamber,
+                (v_status->>'status_date')::TIMESTAMP,
                 v_status->>'history_action',
                 (v_status->>'vote_action_present')::BOOLEAN,
                 NULLIF(v_status->>'vote_action','')::INT
@@ -84,8 +84,8 @@ BEGIN
                 SELECT 1
                 FROM bill_status_history
                 WHERE fk_bill_id = v_bill_id
-                  AND chamber = v_status->>'chamber'::chamber
-                  AND status_date = (v_status->>'status_date')::DATE
+                  AND chamber = (v_status->>'chamber')::chamber
+                  AND status_date = (v_status->>'status_date')::TIMESTAMP
                   AND history_action = v_status->>'history_action'
             );
         END LOOP;

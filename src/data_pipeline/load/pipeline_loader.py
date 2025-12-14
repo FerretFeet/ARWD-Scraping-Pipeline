@@ -36,9 +36,13 @@ class PipelineLoader:
                 prefixed_params[k] = json.dumps(v) if v else None
             elif isinstance(v, datetime.datetime):
                 prefixed_params[k] = v.isoformat()
+            elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+                prefixed_params[k] = [json.dumps(w) for w in v]
             else:
                 prefixed_params[k] = v
         sql = self.sql_template
+        print(f"DEBUG PIPELINE LOADER "
+              f"prefixed params: {prefixed_params}")
         if isinstance(db_conn, psycopg.Connection):
             with db_conn.cursor(row_factory=rows.dict_row) as cur:
                 cur.execute(self.insert, prefixed_params)

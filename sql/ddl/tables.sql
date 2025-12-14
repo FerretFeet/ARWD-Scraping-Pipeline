@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS bill_status_history (
     history_action TEXT,
     fk_vote_event_id INT,
     vote_action_present BOOLEAN NOT NULL,
-    FOREIGN KEY (fk_bill_id) REFERENCES legislators(legislator_id),
+    FOREIGN KEY (fk_bill_id) REFERENCES bills(bill_id),
     FOREIGN KEY (fk_vote_event_id) REFERENCES vote_events(vote_event_id)
 );
 

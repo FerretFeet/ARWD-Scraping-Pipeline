@@ -98,13 +98,18 @@ class CrawlerWorker(BaseWorker):
                 links: dict = self._parse_html(working_node.url, html)
                 if links:
                     self._enqueue_links(node, links)
-                if links and self._check_processing_step(working_node.url): # No next step, dont send to queue
-                    self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
-                    node.data = links
-                elif self._check_processing_step(working_node.url):
-                    working_node.data["html"] = html
+
+                working_node.data["html"] = html
+
+                if self._check_processing_step(working_node.url):
                     self._set_state(working_node, PipelineStateEnum.AWAITING_PROCESSING)
                     self.output_queue.put(working_node)
+                elif links and any(node.state != PipelineStateEnum.COMPLETED
+                                for node in working_node.outgoing): # Next-step and children
+                    self._set_state(working_node, PipelineStateEnum.AWAITING_CHILDREN)
+                else:
+                    self._set_state(working_node, PipelineStateEnum.COMPLETED)
+                    self.state.safe_remove_root(node.url, known_links_cache_file)
 
             except Exception as e:
                 logger.error(f"[{self.name.upper()}]: {e}")
@@ -350,10 +355,10 @@ class LoaderWorker(BaseWorker):
                 node.data = result
             else:
                 node.data = None
-            if any(cn.state for cn in node.outgoing) != PipelineStateEnum.COMPLETED:
-                self._set_state(node, PipelineStateEnum.AWAITING_CHILDREN)
-            else:
+            if all(cn.state == PipelineStateEnum.COMPLETED for cn in node.outgoing):
                 self._set_state(node, PipelineStateEnum.COMPLETED)
+            else:
+                self._set_state(node, PipelineStateEnum.AWAITING_CHILDREN)
             with self.state.lock:
                 self._remove_nodes(node)
                 # TODO: Fix load from save

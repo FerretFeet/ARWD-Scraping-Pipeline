@@ -9,7 +9,7 @@ from src.utils.paths import project_root
 PDF_DIR = project_root / "data" / "pdf"
 
 
-def downloadPDF(category: str, bill_no: str, url: str) -> Path | None:
+def downloadPDF(parent_rel_dir: str, file_name: str, url: str) -> Path | None:
     """
     Download a PDF from a URL and save it locally.
     
@@ -17,10 +17,10 @@ def downloadPDF(category: str, bill_no: str, url: str) -> Path | None:
     """
     if not url: return None
     #Request PDF
-    category_dir = PDF_DIR / category
+    category_dir = PDF_DIR / parent_rel_dir
     category_dir.mkdir(parents=True, exist_ok=True)
 
-    pdf_path = category_dir / f"{bill_no}.pdf"
+    pdf_path = category_dir / f"{file_name}.pdf"
 
     # Skip download if file already exists
     if pdf_path.exists():
