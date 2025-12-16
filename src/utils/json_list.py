@@ -1,3 +1,5 @@
+"""Utility functions for loading Json files."""
+
 import json
 from pathlib import Path
 
@@ -5,7 +7,7 @@ from pathlib import Path
 def load_json_list(file_path: str | Path) -> list:
     """
     Load a JSON file as a list.
-    
+
     Returns an empty list if the file does not exist or is invalid.
     """
     file_path = Path(file_path)
@@ -23,10 +25,11 @@ def load_json_list(file_path: str | Path) -> list:
     except json.JSONDecodeError:
         return []
 
+
 def append_to_json_list(file_path: str | Path, new_item: str) -> None:
     """
     Append a dictionary to a JSON list file.
-    
+
     Creates the file if it does not exist.
     """
     file_path = Path(file_path)

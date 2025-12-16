@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 
 class PipelineStateEnum(IntEnum):
+    """Pipeline steps."""
 
     ERROR = -1
     CREATED = 0
@@ -34,7 +35,7 @@ class Node:
 
     id_counter = 1
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         *,
         node_type: PipelineRegistryKeys,
@@ -102,16 +103,17 @@ class IndexedTree:
             self.set_root(root)
         self.name = name
 
-    def reset(self):
+    def reset(self) -> None:
+        """Remove all nodes references from tree."""
         self.nodes: dict[int, Node] = {}
-        self.root
+        self.root = {}
 
     def set_root(self, root: Node) -> None:
         """Set root tree."""
         self.nodes[root.id] = root
         self.root = root
 
-    def add_node(  # noqa: PLR0913
+    def add_node(
         self,
         *,
         node_type: PipelineRegistryKeys,
@@ -153,7 +155,8 @@ class IndexedTree:
             if node not in self.nodes:
                 return
             node = self.nodes[node]
-        if not node.parent: return
+        if not node.parent:
+            return
         parent_id = node.parent.id
 
         if parent_id and parent_id in self.nodes and node in node.parent.children:
@@ -211,7 +214,8 @@ class IndexedTree:
         node_attrs: dict | None = None,
     ) -> Node | None:
         should_visit = True
-        if not node: return None
+        if not node:
+            return None
         if data_attrs and node:
             for key, value in data_attrs.items():
                 if key not in node.data:
@@ -311,9 +315,9 @@ class IndexedTree:
         Find an ancestor with a specified .data attr or value.
 
         Args:
-            node is a IndexedTree node or node id
-            data_attrs is a dict of key and optional values to match a node's data attribute.
-            node_attrs is a dict of key and optional values to match a node's direct attributes.
+            node: is a IndexedTree node or node id
+            data_attrs: is a dict of key and optional values to match a node's data attribute.
+            node_attrs: is a dict of key and optional values to match a node's direct attributes.
 
         Returns:
             A dict of key:val for all given keys for the first node which matches all given keys
@@ -332,12 +336,13 @@ class IndexedTree:
             dattrs.update(nattrs)
             return dattrs
 
-        if not node.parent: return None
+        if not node.parent:
+            return None
         return self.find_val_in_ancestor(node.parent, data_attrs, node_attrs)
 
     # --- Serialization Methods ---
 
-    def to_JSON(self) -> str:  # noqa: N802
+    def to_JSON(self) -> str:
         """Serialize IndexedTree to a JSON string."""
         data = {
             "root_id": self.root.id if self.root else None,
@@ -345,7 +350,7 @@ class IndexedTree:
         }
         return json.dumps(data, indent=4)
 
-    def from_JSON(self, json_str: str) -> None:  # noqa: N802
+    def from_JSON(self, json_str: str) -> None:
         """Load IndexedTree from a JSON string."""
         data = json.loads(json_str)
 
@@ -385,7 +390,6 @@ class IndexedTree:
     def load_from_file(self, filepath: Path) -> None | int:
         """Load tree from a file."""
         if not Path(filepath).exists():
-            msg = f"{filepath} does not exist."
             # raise FileNotFoundError(msg)
             return None
 
@@ -405,8 +409,10 @@ class IndexedTree:
             f"Root: {self.root.id if self.root else 'None'})"
         )
 
-    def reconstruct_order(self):
-        return (self.reverse_in_order_traversal(
+    def reconstruct_order(self) -> list[Node]:
+        """Reconstruct an ordered list of nodes."""
+        return (
+            self.reverse_in_order_traversal(
                 self.root,
                 node_attrs={"state": PipelineStateEnum.AWAITING_FETCH},
             )

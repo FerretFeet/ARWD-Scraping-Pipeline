@@ -1,3 +1,5 @@
+"""Download a pdf file from a url in a specified filepath from project root."""
+
 import time
 from pathlib import Path
 
@@ -12,11 +14,12 @@ PDF_DIR = project_root / "data" / "pdf"
 def downloadPDF(parent_rel_dir: str, file_name: str, url: str) -> Path | None:
     """
     Download a PDF from a URL and save it locally.
-    
+
     returns Path(PDF_DIR)/category/bill_no.pdf.
     """
-    if not url: return None
-    #Request PDF
+    if not url:
+        return None
+    # Request PDF
     category_dir = PDF_DIR / parent_rel_dir
     category_dir.mkdir(parents=True, exist_ok=True)
 
@@ -27,13 +30,13 @@ def downloadPDF(parent_rel_dir: str, file_name: str, url: str) -> Path | None:
         logger.info(f"PDF already exists: {pdf_path}")
         return pdf_path
 
-    response = requests.get(url)
+    response = requests.get(url, timeout=3)
     if response.status_code != 200:  # noqa: PLR2004
         msg = f"Failed to download PDF ({response.status_code})"
-        raise Exception(msg)
-    #Search if already exists
+        raise Exception(msg)  # noqa: TRY002
+    # Search if already exists
     pdf_path.write_bytes(response.content)
-    time.sleep(0.5) # Courtesy
+    time.sleep(0.5)  # Courtesy
     logger.info(f"PDF downloaded to: {pdf_path}")
 
     return pdf_path

@@ -213,9 +213,9 @@ def test_preorder_traversal():
     """
     t = IndexedTree()
     n1 = t.add_node(node_type=1, parent=None, url="1")
-    n2 = t.add_node(node_type=1, parent=n1, url="2")
+    t.add_node(node_type=1, parent=n1, url="2")
     n3 = t.add_node(node_type=1, parent=n1, url="3")
-    n4 = t.add_node(node_type=1, parent=n3, url="4")
+    t.add_node(node_type=1, parent=n3, url="4")
 
     # Preorder: Root, Left, Right (recursive) -> 1, 2, 3, 4
     result = t.preorder_traversal(n1.id)
@@ -239,8 +239,8 @@ def test_reverse_in_order_traversal():
     """
     t = IndexedTree()
     n1 = t.add_node(node_type=1, parent=None, url="1")
-    n2 = t.add_node(node_type=1, parent=n1, url="2")
-    n3 = t.add_node(node_type=1, parent=n1, url="3")
+    t.add_node(node_type=1, parent=n1, url="2")
+    t.add_node(node_type=1, parent=n1, url="3")
 
     result = t.reverse_in_order_traversal(n1.id)
     ids = [n.id for n in result]

@@ -1,5 +1,7 @@
-# db_connect.py
+"""Generator for a psycopg3 database connection."""
+
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
 
 import psycopg
@@ -16,15 +18,10 @@ DB_PASSWORD = os.getenv("SCRAPER_PASS")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_SCHEMA = os.getenv("SCRAPER_SCHEMA", "public")  # default to public if not set
-assert DB_NAME is not None
-assert DB_USER is not None
-assert DB_PASSWORD is not None
-assert DB_HOST is not None
-assert DB_PORT is not None
-assert DB_SCHEMA is not None
+
 
 @contextmanager
-def db_conn():
+def db_conn() -> Generator:
     """
     Context manager that yields a psycopg3 connection.
 

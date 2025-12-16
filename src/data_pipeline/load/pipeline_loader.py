@@ -1,3 +1,5 @@
+"""Pipeline loader class."""
+
 import datetime
 import json
 from pathlib import Path
@@ -11,27 +13,35 @@ from src.utils.logger import logger
 
 
 class PipelineLoader:
-    """
-    Configuration object for a specific database loading operation.
-    """
+    """Configuration object for a specific database loading operation."""
 
-    def __init__(self, sql_file_path: Path, upsert_function_name: str,
-                 required_params: dict[str, type], insert: LiteralString, *, strict: bool = False):
+    def __init__(
+        self,
+        sql_file_path: Path,
+        upsert_function_name: str,
+        required_params: dict[str, type],
+        insert: LiteralString,
+        *,
+        strict: bool = False,
+    ) -> None:
+        """Initialize PipelineLoader object."""
         self.sql_file_path: Path = sql_file_path
         self.upsert_function_name: str = upsert_function_name
         self.required_params: dict[str, type] = required_params
         self.insert = insert
 
         self.strict = strict
-        self._template = None
 
     def execute(self, params: dict, db_conn: psycopg.Connection) -> None | dict:
+        """Prepare values for input and execute sql."""
         self.validate_input(params)
         prefixed_params = {f"p_{key}": value for key, value in params.items()}
 
-        for k, v in prefixed_params.items():
+        for k, val in prefixed_params.items():
+            v = val
             if k == "p_url":
-                v = strip_session_from_link(v, getSession=False)
+                v = strip_session_from_link(val, getSession=False)
+
             if isinstance(v, dict):
                 prefixed_params[k] = json.dumps(v) if v else None
             elif isinstance(v, datetime.datetime):
@@ -40,9 +50,6 @@ class PipelineLoader:
                 prefixed_params[k] = [json.dumps(w) for w in v]
             else:
                 prefixed_params[k] = v
-        sql = self.sql_template
-        print(f"DEBUG PIPELINE LOADER "
-              f"prefixed params: {prefixed_params}")
         if isinstance(db_conn, psycopg.Connection):
             with db_conn.cursor(row_factory=rows.dict_row) as cur:
                 cur.execute(self.insert, prefixed_params)
@@ -53,14 +60,9 @@ class PipelineLoader:
             return db_conn.fetchone()
         return None
 
-
-
     def validate_input(self, input_params: dict[str, Any]) -> bool:
         """Ensure all required keys are present in the input dictionary."""
-        missing_keys = [
-            key for key in self.required_params
-            if key not in input_params
-        ]
+        missing_keys = [key for key in self.required_params if key not in input_params]
         if missing_keys:
             msg = (
                 f"Loader for {self.upsert_function_name} is missing required parameters: "
@@ -73,9 +75,3 @@ class PipelineLoader:
                 )
             return False
         return True
-
-    @property
-    def sql_template(self) -> str:
-        if not self._template:
-            self._template = self.sql_file_path.read_text()
-        return self._template

@@ -1,7 +1,9 @@
 """Web Crawler for requesting and parsing HTML content."""
+
 import os
 import time
 
+import requests
 from dotenv import load_dotenv
 from requests import RequestException, Session
 
@@ -11,11 +13,18 @@ from src.utils.paths import project_root
 
 load_dotenv(project_root / ".env")
 
+
 class Crawler:
     """Web Crawler for requesting and parsing HTML content."""
 
-    def __init__(self, site: str, *, strict: bool | None = None, max_retries: int = 3,
-        retry_backoff: float = 0.5) -> None:
+    def __init__(
+        self,
+        site: str,
+        *,
+        strict: bool | None = None,
+        max_retries: int = 3,
+        retry_backoff: float = 0.5,
+    ) -> None:
         """Initialize the Crawler with domain base-url and optional strict parameter."""
         self.site = site
         self.strict = project_config["strict"] if strict is None else strict
@@ -25,12 +34,15 @@ class Crawler:
         self.max_retries = max_retries
         self.retry_backoff = retry_backoff
 
-    def create_session(self):
+    def create_session(self) -> requests.Session:
+        """Create session object."""
         session = Session()
-        session.headers.update({
-            "User-Agent": os.getenv("HTTP_HEADER_USER_AGENT"),
-            "From": os.getenv("HTTP_HEADER_FROM"),
-        })
+        session.headers.update(
+            {
+                "User-Agent": os.getenv("HTTP_HEADER_USER_AGENT"),
+                "From": os.getenv("HTTP_HEADER_FROM"),
+            },
+        )
         return session
 
     def increment_session(self) -> None:
@@ -63,14 +75,11 @@ class Crawler:
                     time.sleep(sleep_for)
                 else:
                     # Final attempt failed → now treated as fatal
-                    message = (
-                        f"Failed to fetch URL {url} after {self.max_retries} attempts: {e}"
-                    )
+                    message = f"Failed to fetch URL {url} after {self.max_retries} attempts: {e}"
                     logger.error(message)
                     raise ConnectionError(message) from e
             else:
                 return html.text  # SUCCESS
-
 
         # Should never reach here
         msg = f"Unknown error while fetching {url}"

@@ -17,8 +17,7 @@ def known_committee_list_html_fixture() -> str:
         project_root / "tests" / "fixtures" / "html" / "bill_list_page" / "bill_list.known.html"
     )
     with fixture_path.open(encoding="utf-8") as f:
-        html = f.read()
-        return html
+        return f.read()
 
 
 class TestBillListLinkSelector:
@@ -29,5 +28,5 @@ class TestBillListLinkSelector:
         result = parser.get_content(selector, known_committee_list_html_fixture)
 
         assert result is not None
-        for key in result.keys():
+        for key in result:
             assert result[key] is not None

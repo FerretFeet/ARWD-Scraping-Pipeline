@@ -52,7 +52,7 @@ def loader(sql_file_path):
 # Helper functions
 # --------------------------------------------------------------------------
 
-def _insert_session(db, code, name, start_date):
+def _insert_session(db, code, name, start_date) -> None:
     """Helper to ensure session exists for lookup."""
     db.execute("""
         INSERT INTO sessions (session_code, session_name, start_date)

@@ -5,6 +5,6 @@ from typing import TypeVar
 T = TypeVar("T")
 
 
-def empty_transform(arg: T, *, strict: bool = False) -> T:  # noqa: ARG001, UP047
+def empty_transform(arg: T, *, strict: bool = False) -> T:  # noqa: UP047
     """Do nothing, return value unchanged."""
     return arg

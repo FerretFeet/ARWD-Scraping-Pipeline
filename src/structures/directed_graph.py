@@ -1,3 +1,5 @@
+"""Thread-safe directed graph and Node object."""
+
 import json
 import threading
 from collections import OrderedDict
@@ -19,7 +21,7 @@ class Node:
 
     id_counter = 1
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         node_type: PipelineRegistryKeys,
         url: str | None,
@@ -58,34 +60,40 @@ class Node:
             self.state = state
 
     def set_state(self, state: PipelineStateEnum) -> None:
+        """Set state."""
         # with self.lock:
-            self.state = state
+        self.state = state
+
     def add_container(self, container_ref: Any) -> None:
+        """Add/Replace container reference."""
         # with self.lock:
-            self.container = container_ref
+        self.container = container_ref
 
     def add_incoming(self, incoming_ref: Any) -> None:
+        """Add incoming reference."""
         # with self.lock:
-            self.incoming.add(incoming_ref)
+        self.incoming.add(incoming_ref)
 
     def add_outgoing(self, outgoing_ref: Any) -> None:
+        """Add outgoing reference."""
         # with self.lock:
-            self.outgoing.add(outgoing_ref)
+        self.outgoing.add(outgoing_ref)
 
     def remove_container(self, container_ref: Any) -> None:
+        """Remove container reference."""
         if self.container == container_ref:
             # with self.lock:
-                self.container = None
+            self.container = None
 
     def remove_incoming(self, incoming_ref: Any) -> None:
-        # with self.lock:
-            self.incoming.remove(incoming_ref)
+        """Remove incoming reference."""
+        self.incoming.remove(incoming_ref)
 
     def remove_outgoing(self, outgoing_ref: Any) -> None:
-        # with self.lock:
-            self.outgoing.remove(outgoing_ref)
+        """Remove outgoing reference."""
+        self.outgoing.remove(outgoing_ref)
 
-    def _compare(self, val1, val2):
+    def _compare(self, val1: Any, val2: Any) -> bool:
         """Compare two values safely, with partial URL match."""
         if isinstance(val1, str) and isinstance(val2, str):
             # Treat strings starting with "/" or "http" as URLs
@@ -102,13 +110,13 @@ class Node:
         except TypeError:
             return val1 == val2
 
-
-    def _isMatch(
+    def isMatch(
         self,
         *,
         data_attrs: dict | None = None,
         node_attrs: dict | None = None,
     ) -> bool:
+        """Check if this node matches the given attrs."""
         should_visit = True
         if data_attrs:
             for key, value in data_attrs.items():
@@ -120,7 +128,8 @@ class Node:
                 if value is not None and node_value != value:
                     should_visit = False
                     return False
-        if should_visit is False: return False
+        if should_visit is False:
+            return False
         if node_attrs:
             for key, value in node_attrs.items():
                 node_value = getattr(self, key, None)
@@ -129,14 +138,13 @@ class Node:
                     return False
         return should_visit
 
-
     def to_dict(self) -> dict[str, Any]:
         """Serialize node to a dictionary."""
         return {
             "id": self.id,
             "outgoing_ids": [node.id for node in self.outgoing],
             "incoming_ids": [node.id for node in self.incoming],
-            "type": self.type.value, # Store Enum as int
+            "type": self.type.value,  # Store Enum as int
             "url": self.url,
             "data": self.data,
             "state": self.state.value,  # Store Enum as int
@@ -146,7 +154,7 @@ class Node:
     def __repr__(self) -> str:
         """Represent Node as string."""
 
-        def _shorten(val, max_len=250):
+        def _shorten(val: Any, max_len: int = 250) -> str:
             """Return a truncated string representation if too long."""
             s = str(val)
             if len(s) > max_len:
@@ -165,8 +173,13 @@ class Node:
 
 
 class DirectionalGraph:
-    def __init__(self, nodes: list[Node] | None = None, name: str = "Directional Graph") \
-            -> None:
+    """
+    Thread-safe directed graph.
+
+    Assumes a node with a state: PipelineStateEnum and a .data attr.
+    """
+
+    def __init__(self, nodes: list[Node] | None = None, name: str = "Directional Graph") -> None:
         """
         Initialize Directional Graph.
 
@@ -181,65 +194,80 @@ class DirectionalGraph:
         if nodes is not None:
             self.load_node_list(nodes)
         self.lock = threading.RLock()
+
     def add_node(self, node: Node) -> None:
+        """Add node to nodes list."""
         with self.lock:
             self.nodes.update({unquote(unescape(node.url)): node})
 
     def set_nodes(self, nodes: OrderedDict[str, Node] | None) -> None:
+        """Set all nodes using an ordered dict of [url, Node]."""
         with self.lock:
             self.nodes = nodes
 
-    def get_nodes(self):
-        # with self.lock:
+    def get_nodes(self) -> OrderedDict:
+        """Get all nodes."""
+        with self.lock:
             return self.nodes.copy()
+
     def remove_node(self, node: Node) -> Node:
+        """Remove node from nodes dict."""
         with self.lock:
             return self.nodes.pop(node.url)
 
-    def get_roots(self):
+    def get_roots(self) -> set[Node]:
+        """Get seed urls."""
         with self.lock:
             return self.roots.copy()
 
     def remove_root(self, node: Node) -> None:
+        """Remove seed url."""
         with self.lock:
             return self.roots.remove(node)
 
     def add_root(self, node: Node) -> None:
+        """Add seed url."""
         with self.lock:
             self.roots.add(node)
 
     def set_root(self, nodes: set[Node] | None) -> None:
+        """Set seed url."""
         with self.lock:
             self.roots = nodes
 
-    def load_node_list(self, nodes: list[Node]):
+    def load_node_list(self, nodes: list[Node]) -> None:
+        """Input a list of nodes into the graph."""
         with self.lock:
             for node in nodes:
                 self.nodes[node.url] = node
 
-
-    def reset(self):
+    def reset(self) -> None:
         """Reset graph."""
         with self.lock:
             self.nodes = OrderedDict()
             self.roots = set()
 
-    def add_new_node(self, url:str, node_type: PipelineRegistryKeys,
-                     incoming: list[Node] | None, *, outgoing: list[Node] | None = None,
-                     data: dict | None = None,
-                     state: PipelineStateEnum = PipelineStateEnum.CREATED,
-                     override_id: int | None = None,
-                     isRoot: bool = False,
-                     ):
+    def add_new_node(
+        self,
+        url: str,
+        node_type: PipelineRegistryKeys,
+        incoming: list[Node] | None,
+        *,
+        outgoing: list[Node] | None = None,
+        data: dict | None = None,
+        state: PipelineStateEnum = PipelineStateEnum.CREATED,
+        override_id: int | None = None,
+        isRoot: bool = False,
+    ) -> Node | None:
         """Create new node and add to graph."""
         new_node = Node(
-        node_type,
-        url,
-        incoming = incoming,
-        outgoing = outgoing,
-        data = data,
-        state = state,
-        override_id = override_id,
+            node_type,
+            url,
+            incoming=incoming,
+            outgoing=outgoing,
+            data=data,
+            state=state,
+            override_id=override_id,
         )
         if incoming is not None:
             for link in incoming:
@@ -252,14 +280,14 @@ class DirectionalGraph:
                 if outlink is not None:
                     outlink.add_incoming(new_node)
 
-
         return self.add_existing_node(new_node, isRoot=isRoot)
 
     def set_node_state(self, node: Node, state: PipelineStateEnum) -> None:
+        """Set node state."""
         with self.lock:
             node.set_state(state)
 
-    def add_existing_node(self, node: Node, *, isRoot: bool = False) -> Node | None:  # noqa: N803
+    def add_existing_node(self, node: Node, *, isRoot: bool = False) -> Node | None:
         """Add node to graph."""
         node.add_container(self)
         with self.lock:
@@ -282,9 +310,11 @@ class DirectionalGraph:
     def delete_node(self, node: Node) -> None:
         """Remove node from graph."""
         with self.lock:
-            if not self.nodes.get(unquote(unescape(node.url))): return
+            if not self.nodes.get(unquote(unescape(node.url))):
+                return
             delnode = self.nodes.pop(unquote(unescape(node.url)))
-            if delnode is None: return
+            if delnode is None:
+                return
             if delnode in self.roots:
                 self.roots.remove(delnode)
             for outnode in list(delnode.outgoing):
@@ -310,21 +340,12 @@ class DirectionalGraph:
             True: If the node's state is now COMPLETED.
             False: If the node is still busy, either locally or because a descendant is busy.
 
-        """
-        # 1. Local Completion Check: Has the node finished its own work?
-        # This function should only attempt to complete a node that has finished its local job.
-        if (
-            node.state != PipelineStateEnum.AWAITING_CHILDREN
-            and node.state != PipelineStateEnum.COMPLETED
-        ):
-            # If the node is still RUNNING, FAILED, or PENDING, we stop here.
+        """  # noqa: D205
+        if node.state not in (PipelineStateEnum.AWAITING_CHILDREN, PipelineStateEnum.COMPLETED):
             return False
 
-        # If the node is already COMPLETED, treat it as clean and propagate True upward immediately.
         if node.state == PipelineStateEnum.COMPLETED:
             return True
-
-        # --- At this point, node.state must be AWAITING_CHILDREN ---
 
         is_subtree_clean = True
         with self.lock:
@@ -334,7 +355,6 @@ class DirectionalGraph:
                 if not child_is_completed:
                     is_subtree_clean = False
                     break
-            # Update state
             if is_subtree_clean:
                 # All children and their descendants are COMPLETED.
                 node.set_state(PipelineStateEnum.COMPLETED)
@@ -374,54 +394,84 @@ class DirectionalGraph:
             return False
 
     def propogate_downward_deletion(self, node: Node) -> None:
+        """Recursively delete all outgoing nodes."""
         if node.outgoing:
             with self.lock:
                 for outnode in node.outgoing.copy():
                     self.propogate_downward_deletion(outnode)
         self.delete_node(node)
 
-
-    def find_in_graph(self, data_attrs: dict | None = None,
-                      node_attrs: dict | None = None, *, find_single: bool = True) -> Node | None | list[Node]:
+    def find_in_graph(
+        self,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+        *,
+        find_single: bool = True,
+    ) -> Node | None | list[Node]:
         """Find node by node attrs or node data attrs."""
-        result = [node for node in self.get_nodes().values()
-                  if node._isMatch(data_attrs=data_attrs, node_attrs=node_attrs)]  # noqa: SLF001
+        result = [
+            node
+            for node in self.get_nodes().values()
+            if node.isMatch(data_attrs=data_attrs, node_attrs=node_attrs)
+        ]
         if result:
             return result[0] if find_single else result
         return None
 
-    def search_ancestors(self, node: Node, data_attrs: dict | None = None,
-                         node_attrs: dict | None = None):
+    def search_ancestors(
+        self,
+        node: Node,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+    ) -> Node | None:
+        """Search recursively through incoming nodes."""
         return self._directional_search(node, data_attrs, node_attrs, searchUp=True)
 
-    def search_descendants(self, node: Node, data_attrs: dict | None = None,
-                           node_attrs: dict | None = None):
+    def search_descendants(
+        self,
+        node: Node,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+    ) -> Node | None:
+        """Search recursively through outgoing nodes."""
         return self._directional_search(node, data_attrs, node_attrs, searchUp=False)
 
-    def _directional_search(self, node: Node, data_attrs: dict | None = None,
-                           node_attrs: dict | None = None, *,
-                            searchUp: bool = True,  # noqa: N803
-                           searched_nodes: set[Node] | None = None):
+    def _directional_search(
+        self,
+        node: Node,
+        data_attrs: dict | None = None,
+        node_attrs: dict | None = None,
+        *,
+        searchUp: bool = True,
+        searched_nodes: set[Node] | None = None,
+    ) -> Node | None:
 
         searched_nodes = searched_nodes or set()
-        if node in searched_nodes: return None
+        if node in searched_nodes:
+            return None
 
-        if node._isMatch(data_attrs=data_attrs, node_attrs=node_attrs):  # noqa: SLF001
+        if node.isMatch(data_attrs=data_attrs, node_attrs=node_attrs):
             return node
 
         searched_nodes.add(node)
         next_search = node.incoming if searchUp else node.outgoing
         for next_node in next_search:
-            result = self._directional_search(next_node, data_attrs, node_attrs,
-                                           searched_nodes=searched_nodes, searchUp=searchUp)
+            result = self._directional_search(
+                next_node,
+                data_attrs,
+                node_attrs,
+                searched_nodes=searched_nodes,
+                searchUp=searchUp,
+            )
             if result:
                 return result
         return None
 
-    def to_JSON(self) -> str:  # noqa: N802
+    def to_JSON(self) -> str:
         """Serialize DirectionalGraph to a JSON string."""
 
-        def _json_default(obj):
+        def _json_default(obj: Any) -> Any:
+            """Convert DirectionalGraph to JSON string."""
             if hasattr(obj, "isoformat"):
                 return obj.isoformat()
             return str(obj)
@@ -435,7 +485,7 @@ class DirectionalGraph:
         }
         return json.dumps(data, indent=4, default=_json_default)
 
-    def from_JSON(self, json_str: str) -> None:
+    def from_JSON(self, json_str: str) -> None:  # noqa: C901
         """Load graph from JSON string (replaces current graph)."""
         data = json.loads(json_str)
         # clear current state
@@ -455,11 +505,11 @@ class DirectionalGraph:
             try:
                 # if stored as int
                 node_type_enum = PipelineRegistryKeys(raw_type)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # if it's already an enum value or string, try to handle gracefully
                 try:
                     node_type_enum = PipelineRegistryKeys(node_data["type"])
-                except Exception:
+                except Exception:  # noqa: BLE001
                     # fallback: leave as-is (but this is not ideal)
                     node_type_enum = node_data["type"]
 
@@ -502,7 +552,6 @@ class DirectionalGraph:
         if self.nodes:
             Node.id_counter = max(node.id for node in self.nodes.values()) + 1
 
-
     def save_completed_root_url(self, nodeurl: str, filepath: Path) -> None:
         """Append deleted root url to a file."""
         filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -543,7 +592,8 @@ class DirectionalGraph:
             self.from_JSON(json_str)
             if self.nodes:
                 logger.info(
-                    f"Tree loaded from {filepath} with {len(self.nodes)} nodes, {len(self.roots)} roots FROM JSON"
+                    f"Tree loaded from {filepath} with {len(self.nodes)} nodes,"
+                    f" {len(self.roots)} roots FROM JSON"
                     f"\nroots: {self.roots}",
                 )
                 return 1
@@ -551,9 +601,4 @@ class DirectionalGraph:
 
     def __repr__(self) -> str:
         """Represent IndexedTree as a string."""
-        return (
-            f"IndexedTree(Nodes: {len(self.nodes)}, "
-            f"Name: {self.name if self.name else 'None'})"
-        )
-
-
+        return f"IndexedTree(Nodes: {len(self.nodes)}, Name: {self.name if self.name else 'None'})"

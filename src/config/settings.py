@@ -15,12 +15,14 @@ project_config = {
     "state_cache_file": state_cache_file,
     "known_links_cache_file": known_links_cache_file,
 }
-def get_pipeline_registry():
+
+
+def get_pipeline_registry() -> ProcessorRegistry:
+    """Instantiate pipeline registry object."""
     registry = ProcessorRegistry()
     registry.load_p_config(PROCESSOR_CONFIG)
     registry.load_l_config(LOADER_CONFIG)
     return registry
+
+
 PIPELINE_REGISTRY = get_pipeline_registry()
-
-
-

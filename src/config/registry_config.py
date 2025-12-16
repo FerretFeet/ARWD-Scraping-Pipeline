@@ -1,3 +1,8 @@
+"""
+Configuration file for pipeline registry.
+
+Define all registry entries in this file.
+"""
 
 from src.config.pipeline_enums import PipelineRegistries, PipelineRegistryKeys
 from src.data_pipeline.extract.fetching_templates import arkleg_fetchers
@@ -33,7 +38,7 @@ LOADER_CONFIG: dict = {
         },
         "name": "Upsert Bill with Sponsors",
         "filepath": SQL_LOADER_BASE_PATH / "upsert_bill_with_sponsors.sql",
-        "insert":"""
+        "insert": """
             SELECT upsert_bill_with_sponsors(
                p_title := %(p_title)s,
                p_bill_no := %(p_bill_no)s,
@@ -49,7 +54,6 @@ LOADER_CONFIG: dict = {
                ) AS bill_id;
         """,
     },
-
     PipelineRegistryKeys.BILL_VOTE: {
         "params": {
             "bill_id",
@@ -71,7 +75,6 @@ LOADER_CONFIG: dict = {
             );
         """,
     },
-
     PipelineRegistryKeys.LEGISLATOR: {
         "params": {
             "first_name",

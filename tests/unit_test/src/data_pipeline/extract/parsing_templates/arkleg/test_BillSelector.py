@@ -35,7 +35,7 @@ def fake_state():
                                   PipelineRegistryKeys.LEGISLATOR, [leglistnode])
     leg2node = state.add_new_node(unescape("https://arkleg.state.ar.us/Legislators/Detail?member=C.+Cooper&ddBienniumSession=2025%2F2025R"),
                                   PipelineRegistryKeys.LEGISLATOR, [leglistnode])
-    billlistnode = state.add_new_node(unescape("https://arkleg.state.ar.us/Bills/ViewBills?type=HB"),
+    state.add_new_node(unescape("https://arkleg.state.ar.us/Bills/ViewBills?type=HB"),
                                       PipelineRegistryKeys.BILL_LIST, [rootnode])
     comm.data = {"committee_id": 1}
     leg1node.data = {"legislator_id": 1}
@@ -51,7 +51,7 @@ def mock_processor_worker(fake_state, mocker):
     mocker.patch("src.data_pipeline.extract.parsing_templates.arkleg.bill_selector.downloadPDF", return_value="/example")
 
     # 2. Then, initialize the worker instance
-    worker = ProcessorWorker(
+    return ProcessorWorker(
         Queue(),
         Queue(),
         fake_state,
@@ -61,7 +61,6 @@ def mock_processor_worker(fake_state, mocker):
         strict=False,
     )
 
-    return worker
 
 
 @pytest.fixture(scope="session")
@@ -69,8 +68,7 @@ def known_bill_html_fixture() -> str:
     """Load saved HTML fixture for legislators page."""
     fixture_path = project_root / "tests" / "fixtures" / "html" / "bill_page" / "bill.known.html"
     with fixture_path.open(encoding="utf-8") as f:
-        html = f.read()
-        return html
+        return f.read()
 
 
 class TestArStateLegislatorSelector:
@@ -82,7 +80,6 @@ class TestArStateLegislatorSelector:
         node = Node(PipelineRegistryKeys.BILL, unescape("https://arkleg.state.ar.us/Bills/Detail?id=HB1001&ddBienniumSession=2019%2F2019R"),
                     incoming={parentnode}, data={"html": known_bill_html_fixture})
         t_parser, t_transformer, state_pairs = mock_processor_worker._get_processing_templates(node.url, node)  # noqa: SLF001
-        print(f"NODE IS {node}")
         parsed_data = mock_processor_worker._parse_html(node.url,  # noqa: SLF001
                                           node.data["html"], t_parser)
         parsed_data, t_transformer = mock_processor_worker.inject_session_code(parsed_data, t_transformer, node)
@@ -108,4 +105,4 @@ class TestArStateLegislatorSelector:
                                             "act_text": ["/example"]}
         assert result["session_code"] ==  "2019/2019R"
         assert result["bill_status_history"] == "sfd"
-        assert False
+        raise AssertionError

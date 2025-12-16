@@ -34,7 +34,7 @@ def fake_state():
         PipelineRegistryKeys.ARK_LEG_SEEDER,
         None,
     )
-    commcat = state.add_new_node(
+    state.add_new_node(
         unescape("https://arkleg.state.ar.us/Committees"),
         PipelineRegistryKeys.COMMITTEES_CAT,
         [rootnode],
@@ -156,7 +156,7 @@ def fake_state():
 }
 
     # Add legislator nodes with IDs
-    for idx, (name, url) in enumerate(name_url_map.items(), start=1):
+    for idx, (_name, url) in enumerate(name_url_map.items(), start=1):
         node = state.add_new_node(
             unescape(f"https://arkleg.state.ar.us{url}"),
             PipelineRegistryKeys.LEGISLATOR,
@@ -176,9 +176,8 @@ def fake_state():
 
 @pytest.fixture
 def mock_processor_worker(fake_state):
-    worker = ProcessorWorker(Queue(), Queue(), fake_state, HTMLParser(), PipelineTransformer(),
+    return ProcessorWorker(Queue(), Queue(), fake_state, HTMLParser(), PipelineTransformer(),
                            PIPELINE_REGISTRY, strict=False)
-    return worker
 
 
 
@@ -187,8 +186,7 @@ def known_bill_vote_html_fixture() -> BeautifulSoup:
     """Load saved HTML fixture for legislators page."""
     fixture_path = project_root / "tests" / "fixtures" / "html" / "vote_page" / "vote.known.html"
     with fixture_path.open(encoding="utf-8") as f:
-        html = f.read()
-        return html
+        return f.read()
 
 
 class TestBillVoteSelector:
@@ -200,7 +198,6 @@ class TestBillVoteSelector:
         node = Node(PipelineRegistryKeys.BILL, unescape("https://arkleg.state.ar.us/Bills/Votes?id=HB1001&rcs=38&chamber=Senate&ddBienniumSession=2013%2F2013R"),
                     incoming={parentnode}, data={"html": known_bill_vote_html_fixture})
         t_parser, t_transformer, state_pairs = mock_processor_worker._get_processing_templates(node.url, node)  # noqa: SLF001
-        print(f"NODE IS {node}")
         parsed_data = mock_processor_worker._parse_html(node.url,  # noqa: SLF001
                                           node.data["html"], t_parser)
         parsed_data, t_transformer = mock_processor_worker.inject_session_code(parsed_data, t_transformer, node)

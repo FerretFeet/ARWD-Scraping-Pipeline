@@ -12,6 +12,7 @@ from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.data_pipeline.transform.utils.strip_session_from_string import strip_session_from_link
 from src.data_pipeline.transform.utils.transform_str_to_date import transform_str_to_date
 from src.models.selector_template import SelectorTemplate
+from src.structures import directed_graph
 from src.structures.directed_graph import Node
 from src.utils.strings.get_url_base_path import get_url_base_path
 
@@ -51,8 +52,10 @@ class BillSelector(SelectorTemplate):
                     _BillParsers.parse_other_bill_documents,
                     _BillTransformers.transform_bill_documents,
                 ),
-                "bill_status_history": (_BillParsers.parse_bill_status_history,
-                                        _BillTransformers.transform_bill_status_history),
+                "bill_status_history": (
+                    _BillParsers.parse_bill_status_history,
+                    _BillTransformers.transform_bill_status_history,
+                ),
                 "state_primary_sponsor": (
                     self.primary_sponsor_lookup,
                     empty_transform,
@@ -68,19 +71,26 @@ class BillSelector(SelectorTemplate):
                 "state_download_pdfs": (self.download_doc_pdfs, empty_transform),
             },
         )
-    def download_doc_pdfs(self, node: Node, state_tree, parsed_data: dict):
+
+    def download_doc_pdfs(
+        self,
+        node: Node,
+        state_tree: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> int | None:
         """
         Side effect - download the pdf files, replace urls with local paths.
 
         Created here because it seemed like the easiest place to insert it with the architecture.
         """
-        bill_no = parsed_data.get("bill_no") #hb1001
+        bill_no = parsed_data.get("bill_no")  # hb1001
         base_url = get_url_base_path(node.url, include_path=False)
-        if not bill_no: return None
+        if not bill_no:
+            return None
         session_code = strip_session_from_link(node.url).replace("/", "_")
         category = re.match(r"^([a-zA-Z]+)", bill_no)
         if category:
-            category = category.group(1) #hb, sb, hjr, sjr
+            category = category.group(1)  # hb, sb, hjr, sjr
 
         targets: dict[str, list[str]] = parsed_data.get("bill_documents")
         if not targets:
@@ -94,17 +104,31 @@ class BillSelector(SelectorTemplate):
             if not isinstance(val, list):
                 nval = [val]
             for idx, v in enumerate(nval):
-                lpath = downloadPDF(session_code + "/" + category + "/" + bill_no,
-                                    newbillno + "_" + str(idx),
-                                    urljoin(base_url, v)) if v else None
+                lpath = (
+                    downloadPDF(
+                        session_code + "/" + category + "/" + bill_no,
+                        newbillno + "_" + str(idx),
+                        urljoin(base_url, v),
+                    )
+                    if v
+                    else None
+                )
                 newpaths.append(str(lpath))
             parsed_data["bill_documents"][key] = newpaths
         return 0
 
+    def state_sponsor_lookup(
+        self,
+        node: Node,
+        state_tree: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+        pdkey: str,
+    ) -> dict[str, dict]:
+        """
+        Lookup sponsor id from state.
 
-
-
-    def state_sponsor_lookup(self, node: Node, state_tree, parsed_data, pdkey):
+        Resolve legislators and committees.
+        """
         urls = parsed_data.get(pdkey)
         if not urls:
             return {pdkey: {}}
@@ -119,7 +143,6 @@ class BillSelector(SelectorTemplate):
                 return None
 
             found_node = self.get_dynamic_state(
-                node,
                 state_tree,
                 {rkey: None},
                 {"url": html.unescape(url)},
@@ -127,30 +150,57 @@ class BillSelector(SelectorTemplate):
             if found_node:
                 returndict.setdefault(rkey, []).append(found_node.data[rkey])
             else:
-                #find closest match
+                # find closest match
                 # sometimes links dont go to the right page
                 returndict.setdefault(rkey, []).append(None)
 
         return {pdkey: returndict}
 
-    def primary_sponsor_lookup(self, node, state_tree, parsed_data):
+    def primary_sponsor_lookup(
+        self,
+        node: directed_graph.Node,
+        state_tree: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup primary sponsor id."""
         return self.state_sponsor_lookup(node, state_tree, parsed_data, "lead_sponsor")
 
-    def cosponsors_sponsor_lookup(self, node, state_tree, parsed_data):
+    def cosponsors_sponsor_lookup(
+        self,
+        node: directed_graph.Node,
+        state_tree: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup cosponsors. id."""
         return self.state_sponsor_lookup(node, state_tree, parsed_data, "cosponsors")
 
-    def other_primary_sponsor_lookup(self, node, state_tree, parsed_data):
+    def other_primary_sponsor_lookup(
+        self,
+        node: directed_graph.Node,
+        state_tree: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup other primary sponsor id."""
         return self.state_sponsor_lookup(node, state_tree, parsed_data, "other_primary_sponsor")
 
 
 class _BillTransformers:
+    """Methods for transforming data from ark.leg.bill_detail page."""
 
     @staticmethod
-    def transform_bill_status_history(pinput: list[dict], *, strict: bool = False):
-        x=1
-        if not pinput: return None
+    def transform_bill_status_history(
+        pinput: list[dict],
+        *,
+        strict: bool = False,
+    ) -> list[dict]:
+        """Transform bill status history, normalize strings and format date."""
+        if not pinput:
+            return None
         for item in pinput:
-            for k, v, in item.items():
+            for (
+                k,
+                v,
+            ) in item.items():
                 if k in ["chamber", "history_action"]:
                     item[k] = normalize_str(v)
                 if k == "status_date":
@@ -159,22 +209,23 @@ class _BillTransformers:
                     item[k] = bool(v) if v else False
         return pinput
 
-
-
-        # [{"chamber":"", "history_action":"","status_date":DatetimeObj,
-        # "vote_action_present":"T/F"}]
-
-
     @staticmethod
-    def transform_bill_documents(dinput: dict, *, strict: bool = False):
+    def transform_bill_documents(
+        dinput: dict,
+        *,
+        strict: bool = False,
+    ) -> dict[str, dict]:
+        """
+        Transform bill documents.
+
+        Strip and attach to dictionary.
+        """
         returndict = {}
         for key, val in dinput.items():
             nkey = key.lower()
-            nval = [v.strip() for v in val
-                    if v]
+            nval = [v.strip() for v in val if v]
             returndict.update({nkey: nval})
         return {"bill_documents": returndict}
-
 
     @staticmethod
     def normalize_bill_doc_type(billdoc: str) -> str:
@@ -190,11 +241,15 @@ class _BillParsers:
     @staticmethod
     def parse_bill_status_history(soup: BeautifulSoup) -> list[dict | None]:
         bill_status_history: list[dict | None] = []
-        bill_status_header = soup.find("h3", string=re.compile("Bill Status History",
-                                                               re.IGNORECASE))
-        if not bill_status_header: return bill_status_history
+        bill_status_header = soup.find(
+            "h3",
+            string=re.compile("Bill Status History", re.IGNORECASE),
+        )
+        if not bill_status_header:
+            return bill_status_history
         bill_status_table = bill_status_header.find_next("div", id="tableDataWrapper")
-        if not bill_status_table: return bill_status_history
+        if not bill_status_table:
+            return bill_status_history
         bill_statuses = bill_status_table.find_all("div", class_=["tableRow", "tableRowAlt"])
         for row in bill_statuses:
             status = {}
@@ -202,11 +257,12 @@ class _BillParsers:
             status.update({"chamber": cells[0].get_text(strip=True) if cells[0] else None})
             status.update({"status_date": cells[1].get_text(strip=True) if cells[1] else None})
             status.update({"history_action": cells[2].get_text(strip=True) if cells[2] else None})
-            status.update({"vote_action_present": cells[3].get_text(strip=True) if cells[3] else None})
+            status.update(
+                {"vote_action_present": cells[3].get_text(strip=True) if cells[3] else None},
+            )
             bill_status_history.append(status)
 
         return bill_status_history
-
 
     @staticmethod
     def parse_other_bill_documents(soup: BeautifulSoup) -> dict[str, dict[str, list[str]]] | None:

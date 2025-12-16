@@ -58,5 +58,4 @@ SELECTOR_TESTS = [
         "process": True,
         "required_keys": ["title"],
     },
-    # Add other selectors here...
 ]

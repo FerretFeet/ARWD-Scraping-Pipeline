@@ -17,8 +17,7 @@ def known_committee_list_html_fixture() -> str:
         project_root / "tests" / "fixtures" / "html" / "committee_list" / "clist.known.html"
     )
     with fixture_path.open(encoding="utf-8") as f:
-        html = f.read()
-        return html
+        return f.read()
 
 
 class TestCommitteeListFetchSelector:

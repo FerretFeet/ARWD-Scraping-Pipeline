@@ -34,7 +34,7 @@ docstring-code-format = true
 indent-style = 'space'
 [tool.ruff.lint]
 select = ['ALL']
-ignore = ["E701", "D212", "D203", "ERA001"]
+ignore = ["E701", "D212", "D203", "ERA001", "ANN401", "PLR0913", "N802", "N803", "ARG001", "ARG002", "ARG004"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ['D', 'S101', 'ANN201', 'ANN204', 'INP001', 'ANN001']
 "__init__.py" = ['D']

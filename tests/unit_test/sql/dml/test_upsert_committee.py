@@ -23,14 +23,9 @@ def fetch_committee_info(db, committee_id, committee_name):
     return db.fetchall()
 
 
-# --------------------------------------------------------------------------
-# New Fixture for Setup Data
-# --------------------------------------------------------------------------
 
-# IMPORTANT: You need to place this fixture in your conftest.py or make sure
-# it's imported correctly. It replaces the faulty setup_method.
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def setup_session_data(db):
     """Inserts necessary session data before running tests."""
     db.execute(
@@ -41,16 +36,12 @@ def setup_session_data(db):
                                                                           ('S3', '2022 Session', '2022-01-01');
         """,
     )
-    # The 'db' fixture's rollback will automatically clean this up after the test.
     return True # Return value is arbitrary, mainly used for injection
 
 
 class TestCommitteeInfoSCD2NewSchema:
-    # Set the fixture's input parameter for the function under test
-    # This must match the filename in your SQL_DIR
     sql_file = "upsert_committee.sql"
 
-    # NOTE: The setup_method is now removed entirely!
 
     # --- Test 1: Initial Insert ---
     def test_initial_insert(self, db, setup_session_data):
@@ -60,7 +51,6 @@ class TestCommitteeInfoSCD2NewSchema:
         url = "http://budget.com/v1"
         session = "S1"
 
-        # Call the function
         info_id = db.execute(
             "SELECT upsert_committee(%s, %s, %s, %s)"
             "AS committee_info_id",
@@ -91,14 +81,12 @@ class TestCommitteeInfoSCD2NewSchema:
         session_2 = "S2"
         url_2 = "http://trans.com/new"
 
-        # 1. Initial Insert (S1, URL v1)
         db.execute(
             "SELECT upsert_committee(%s, %s, %s, %s)",
             (comm_id, name, url_1, session_1),
         )
 
         # 2. Second Insert with URL change (S2, URL v2)
-        # The function now returns the static comm_id (202)
         returned_static_id = db.execute(
             "SELECT upsert_committee(%s, %s, %s, %s) AS committee_id",
             (comm_id, name, url_2, session_2),

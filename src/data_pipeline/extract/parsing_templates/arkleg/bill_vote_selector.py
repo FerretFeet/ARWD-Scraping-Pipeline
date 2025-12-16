@@ -1,4 +1,5 @@
 """Selector template for https://arkleg.state.ar.us/Bills/Votes?."""
+
 import html
 import re
 from datetime import datetime
@@ -9,6 +10,7 @@ from bs4 import BeautifulSoup
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
 from src.data_pipeline.transform.utils.normalize_str import normalize_str
 from src.models.selector_template import SelectorTemplate
+from src.structures import directed_graph
 from src.structures.directed_graph import Node
 
 
@@ -47,7 +49,13 @@ class BillVoteSelector(SelectorTemplate):
             },
         )
 
-    def bill_id_lookup(self, node, state, parsed_data):
+    def bill_id_lookup(
+        self,
+        node: directed_graph.Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, str] | None:
+        """Lookup bill id from state."""
         found_node = self.get_dynamic_state_from_parents(node, state, {"bill_id": None}, None)
         if found_node:
             return {"bill_id": found_node.data.get("bill_id")}
@@ -56,8 +64,14 @@ class BillVoteSelector(SelectorTemplate):
             return {"bill_id": bill_id}
         return None
 
-
-    def state_vote_lookup(self, node: Node, state, parsed_data, pdkey):
+    def state_vote_lookup(
+        self,
+        node: Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+        pdkey: str,
+    ) -> dict[str, dict] | None:
+        """Lookup voter ids from state."""
         urls = parsed_data.get(pdkey)
         if not urls:
             return {pdkey: {}}
@@ -66,41 +80,70 @@ class BillVoteSelector(SelectorTemplate):
         for url in urls:
             rkey = "legislator_id"
 
-            found_node = self.get_dynamic_state(
-                node,
-                state,
-                {rkey: None},
-                {"url": html.unescape(url)},
-            )
+            found_node = self.get_dynamic_state(state, {rkey: None}, {"url": html.unescape(url)})
             if found_node:
                 returnlist.append(found_node.data[rkey])
             else:
                 return None
         return {pdkey: {pdkey: returnlist}}
 
-    def yea_lookup(self, node, state, parsed_data):
+    def yea_lookup(
+        self,
+        node: directed_graph.Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup yea voters."""
         return self.state_vote_lookup(node, state, parsed_data, "yea_voters")
 
-    def nay_lookup(self, node, state, parsed_data):
+    def nay_lookup(
+        self,
+        node: directed_graph.Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup nay voters."""
         return self.state_vote_lookup(node, state, parsed_data, "nay_voters")
 
-    def nonvoting_lookup(self, node, state, parsed_data):
+    def nonvoting_lookup(
+        self,
+        node: directed_graph.Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup nonvoting voters."""
         return self.state_vote_lookup(node, state, parsed_data, "non_voting_voters")
 
-    def present_lookup(self, node, state, parsed_data):
+    def present_lookup(
+        self,
+        node: directed_graph.Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup present voters."""
         return self.state_vote_lookup(node, state, parsed_data, "present_voters")
 
-    def excused_lookup(self, node, state, parsed_data):
+    def excused_lookup(
+        self,
+        node: directed_graph.Node,
+        state: directed_graph.DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, dict]:
+        """Lookup excused voters."""
         return self.state_vote_lookup(node, state, parsed_data, "excused_voters")
 
 
 class _VoteListTransformers:
     @staticmethod
-    def transform_vote_title(vote_title_list: list[str], *, strict:bool = False,
-                             tz_name: str="America/Chicago"):
+    def transform_vote_title(
+        vote_title_list: list[str],
+        *,
+        strict: bool = False,
+        tz_name: str = "America/Chicago",
+    ) -> dict[str, str | datetime | None]:
         """
         Take a list like ['House Vote - Tuesday, February 5, 2013 1:43:39 PM'].
-        
+
         returns a dict with keys: vote_timestamp (datetime) and chamber (str)
         """
         if not vote_title_list or not vote_title_list[0]:

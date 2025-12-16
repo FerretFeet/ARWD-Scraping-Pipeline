@@ -8,7 +8,7 @@ from src.data_pipeline.extract import webcrawler
 from src.models.selector_template import SelectorTemplate
 
 
-def extract_parse_content(  # noqa: PLR0913
+def extract_parse_content(
     link: str,
     base_url: str,
     session: Session,

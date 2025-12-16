@@ -1,5 +1,8 @@
+"""Base thread worker class."""
+
 import threading
 from queue import Queue
+from typing import Any, Never
 
 from src.structures import directed_graph
 from src.structures.indexed_tree import PipelineStateEnum
@@ -7,22 +10,35 @@ from src.utils.logger import logger
 
 
 class BaseWorker(threading.Thread):
-    def __init__(self, input_queue: Queue, output_queue: Queue | None = None, *, isDaemon:bool = True, name:str ="BaseWorker") -> None:  # noqa: N803
+    """Base worker class."""
+
+    def __init__(
+        self,
+        input_queue: Queue,
+        output_queue: Queue | None = None,
+        *,
+        isDaemon: bool = True,
+        name: str = "BaseWorker",
+    ) -> None:
+        """Initialize the worker."""
         super().__init__(name=name, daemon=isDaemon)
         self.input_queue = input_queue
         self.output_queue = output_queue
 
-    def fetch_next(self):
+    def fetch_next(self) -> Any:
+        """Fetch the next item from the input queue."""
         item = self.input_queue.get()
         if item is None:
             self.input_queue.task_done()
             return None
         return item
 
-    def mark_done(self):
+    def mark_done(self) -> None:
+        """Mark the input queue as task done."""
         self.input_queue.task_done()
 
-    def run(self):
+    def run(self) -> None:
+        """Run the worker."""
         while True:
             item = self.fetch_next()
             logger.info(f"{self.name.upper()}: Processing item: {item}")
@@ -35,17 +51,20 @@ class BaseWorker(threading.Thread):
                 continue
             try:
                 self.process(item)
-                logger.info(f"[{self.name.upper()}]: Finished processing item: {item}")
-            except Exception as e:
-                logger.warning(f"[{self.name.upper()}]: Exception while processing item: {item}\t: {e}")
-                self.handle_error(item, e)
+            except Exception as e:  # noqa: BLE001
+                msg = f"[{self.name.upper()}]: Exception while processing item: {item}\t: {e}"
+                logger.warning(msg)
+                self.handle_error(item)
             finally:
+                logger.info(f"[{self.name.upper()}]: Finished processing item: {item}")
                 self.mark_done()
 
-    def process(self, item):
+    def process(self, item: Any) -> Never:
+        """Process the item."""
         raise NotImplementedError
 
-    def handle_error(self, item, error):
+    def handle_error(self, item: Any) -> None:
+        """Handle an error."""
         # optional logging or state update
         self._set_state(item, PipelineStateEnum.ERROR)
         logger.exception(f"[{self.name.upper()}]: Exception while processing item: {item}\t")

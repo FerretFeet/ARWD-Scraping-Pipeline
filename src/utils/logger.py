@@ -11,7 +11,7 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
     """Initialize logger."""
     logger = logging.getLogger(__name__)
 
-    logger.setLevel(logging.DEBUG)  # capture everything; handlers filter
+    logger.setLevel(logging.DEBUG)
 
     # --- General log (INFO+) ---
     general_handler = RotatingFileHandler(
@@ -46,5 +46,4 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
     return logger
 
 
-# ---- Usage ----
 logger = setup_logger("scraper.log")

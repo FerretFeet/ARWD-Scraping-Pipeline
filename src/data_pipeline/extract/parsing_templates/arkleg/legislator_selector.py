@@ -1,4 +1,5 @@
 """Selector template for arkleg.state.ar.us/Legislators/Detail?."""
+
 import html
 import re
 
@@ -35,19 +36,23 @@ class LegislatorSelector(SelectorTemplate):
                 "state_committee_ids": (self.committee_ids_lookup, empty_transform),
             },
         )
-    def committee_ids_lookup(self, node: Node, state_tree: DirectionalGraph, parsed_data: dict)\
-            -> dict[str, list[str]]:
+
+    def committee_ids_lookup(
+        self,
+        node: Node,
+        state_tree: DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict[str, list[str]]:
+        """Search through state for committee_ids."""
         urls = parsed_data.get("committee_ids")
         if not urls:
             return {"committee_ids": []}
         result = []
         for url in urls:
             found_node = self.get_dynamic_state(
-                node,
                 state_tree,
                 {"committee_id": None},
                 {"url": html.unescape(url)},
-
             )
             if found_node:
                 result.append(found_node.data.get("committee_id"))

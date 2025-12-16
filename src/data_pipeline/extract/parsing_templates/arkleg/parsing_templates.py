@@ -1,4 +1,5 @@
 """Selector templates for Arkleg.state.ar.us."""
+
 import re
 
 from src.data_pipeline.transform.utils.empty_transform import empty_transform
@@ -14,25 +15,21 @@ class CommitteeSelector(SelectorTemplate):
         """Initialize the selector template."""
         super().__init__(
             selectors={
-                "name": ((
-                    "h1",
-                ), normalize_str),
+                "name": (("h1",), normalize_str),
                 "state_committee_id": (self.strip_committee_code_from_link, empty_transform),
             },
         )
-    def strip_committee_code_from_link(self, node: Node, state_tree: DirectionalGraph, parsed_data: dict):
-        """
-        Strips and returns the committee code from a URL, based on the parameter 'code'.
 
-        Args:
-            url_string (str): The input URL.
-
-        Returns:
-            str or None: The extracted code (e.g., '038'), or None if not found.
-
-        """
+    def strip_committee_code_from_link(
+        self,
+        node: Node,
+        state_tree: DirectionalGraph,
+        parsed_data: dict,
+    ) -> dict | None:
+        """Strip and return the committee code from a URL, based on the parameter 'code'."""
         url = parsed_data.get("url")
-        if not url: return None
+        if not url:
+            return None
 
         pattern = r"code=([0-9A-Za-z]+)"
         match = re.search(pattern, url)

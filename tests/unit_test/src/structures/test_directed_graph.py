@@ -63,13 +63,13 @@ class TestNode:
         node = self.Node(PipelineRegistryKeys.TYPE_A, "url", data={"foo": "bar", "num": 10})
 
         # Test Data Matching (partial match on dict)
-        assert node._isMatch(data_attrs={"foo": "bar"}) is True
-        assert node._isMatch(data_attrs={"foo": "baz"}) is False  # Wrong value
-        assert node._isMatch(data_attrs={"missing": "val"}) is False # Missing key
+        assert node.isMatch(data_attrs={"foo": "bar"}) is True
+        assert node.isMatch(data_attrs={"foo": "baz"}) is False  # Wrong value
+        assert node.isMatch(data_attrs={"missing": "val"}) is False # Missing key
 
         # Test Attribute Matching (properties of the class)
-        assert node._isMatch(node_attrs={"id": node.id}) is True
-        assert node._isMatch(node_attrs={"url": "wrong"}) is False
+        assert node.isMatch(node_attrs={"id": node.id}) is True
+        assert node.isMatch(node_attrs={"url": "wrong"}) is False
 
 
 @patch("src.utils.logger.logger")

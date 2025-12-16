@@ -78,7 +78,7 @@ def fake_state():
 
         node.data = {"committee_id": cid}
 
-    leglistnode = state.add_new_node(unescape("https://arkleg.state.ar.us/Legislators/List"),
+    state.add_new_node(unescape("https://arkleg.state.ar.us/Legislators/List"),
                                      PipelineRegistryKeys.LEGISLATOR_LIST, [rootnode])
 
 
@@ -92,9 +92,8 @@ def loader_queue():
 
 @pytest.fixture
 def mock_processor_worker(fake_state, loader_queue):
-    worker = ProcessorWorker(Queue(), loader_queue, fake_state, HTMLParser(), PipelineTransformer(),
+    return ProcessorWorker(Queue(), loader_queue, fake_state, HTMLParser(), PipelineTransformer(),
                            PIPELINE_REGISTRY, strict=False)
-    return worker
 
 @pytest.fixture
 def test_db(db_engine):
@@ -111,8 +110,7 @@ def test_db(db_engine):
 
 @pytest.fixture
 def mock_loader_worker(fake_state, test_db, loader_queue):
-    worker = LoaderWorker(loader_queue, fake_state, test_db, PIPELINE_REGISTRY)
-    return worker
+    return LoaderWorker(loader_queue, fake_state, test_db, PIPELINE_REGISTRY)
 
 
 
@@ -121,8 +119,7 @@ def known_legislator_html_fixture() -> str:
     """Load saved HTML fixture for legislators page."""
     fixture_path = project_root / "tests" / "fixtures" / "html" / "legislator" / "legislator.known.html"
     with fixture_path.open(encoding="utf-8") as f:
-        html = f.read()
-        return html
+        return f.read()
 
 
 @pytest.fixture

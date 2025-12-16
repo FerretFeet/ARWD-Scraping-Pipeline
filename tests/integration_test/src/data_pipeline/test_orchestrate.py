@@ -14,26 +14,23 @@ from src.structures.indexed_tree import PipelineStateEnum
 from src.structures.registries import ProcessorRegistry
 from src.workers.base_worker import BaseWorker
 
-# --- Mock Classes for Dependencies ---
 
 class MockDirectionalGraph:
 
     def __init__(self):
-        self.roots = set() # Simulate initial state
-        self.nodes = {} # Added to track nodes for integration test
+        self.roots = set()
+        self.nodes = {}
 
     def get_roots(self):
         return self.roots.copy()
 
     def load_from_file(self, path):
-        # Simulate successful load if path contains a specific string
         if "loaded" in str(path):
-            self.roots = {"MOCK_ROOT"}  # Indicate a loaded state
+            self.roots = {"MOCK_ROOT"}
             return True
         return False
 
     def reconstruct_order(self):
-        # Return a list of mock nodes for loaded states
         if self.roots:
             return [
                 MagicMock(
@@ -45,9 +42,6 @@ class MockDirectionalGraph:
         return []
 
     def add_new_node(self, url, node_type, incoming, **kwargs):
-        # Now the positional arguments are correctly captured
-
-        # Combine explicit args and kwargs
         params = {
             "url": url,
             "node_type": node_type,
@@ -55,7 +49,6 @@ class MockDirectionalGraph:
         }
         params.update(kwargs)
 
-        # Mock node creation
         mock_node = MagicMock(spec=directed_graph.Node, **params)
         mock_node.url = url
 
@@ -65,9 +58,6 @@ class MockDirectionalGraph:
             self.roots.add(mock_node)
         return mock_node
 
-# ----------------------------------------------------------------------
-## 🧪 Unit Tests (TestOrchestratorUnit)
-# ----------------------------------------------------------------------
 
 class TestOrchestratorUnit(unittest.TestCase):
     def setUp(self):
@@ -90,26 +80,20 @@ class TestOrchestratorUnit(unittest.TestCase):
             "http://example.com/page2",
         ]
 
-        # Initialize Orchestrator with minimal mocks
         self.orchestrator = Orchestrator(
             registry=self.mock_registry,
             seed_urls=self.seed_urls,
             db_conn=self.mock_db_conn,
             state=self.MockStateGraph,
-            # Mock complex dependencies to be passed to workers
             crawler=MagicMock(),
             parser=MagicMock(),
             transformer=MagicMock(),
             fetch_scheduler=MagicMock(),
         )
 
-    # Note: Patch paths updated to use 'src.data_pipeline.orchestrate'
     @patch("src.data_pipeline.orchestrate.load_json_list", return_value=["http://example.com/page1"])
     def test_filter_and_organize_seed_urls(self, mock_load_json_list):
         """Test initial filtering and domain organization."""
-        # The Orchestrator's __init__ runs the filtering and organizing
-
-        # Re-initialize to test __init__ logic cleanly
         orchestrator_init_test = Orchestrator(
             registry=self.mock_registry,
             seed_urls=self.seed_urls,
@@ -117,37 +101,31 @@ class TestOrchestratorUnit(unittest.TestCase):
             state=directed_graph.DirectionalGraph(),
         )
 
-        # Check Organization: urls should be grouped by domain
         expected_organized_urls = {
             "anothersite.org": ["http://anothersite.org/start"],
             "example.com": ["http://example.com/page2"],
         }
 
-        self.assertEqual(orchestrator_init_test.seed_urls, expected_organized_urls)
+        assert orchestrator_init_test.seed_urls == expected_organized_urls
 
     def test_next_seed(self):
         """Test popping the next seed URL from the correct domain."""
-        # Initial state setup
         self.orchestrator.seed_urls = {
             "example.com": ["http://example.com/page1", "http://example.com/page2"],
             "anothersite.org": ["http://anothersite.org/start"],
         }
 
-        # Pop 1 from example.com
         url1 = self.orchestrator._next_seed("example.com")
-        self.assertEqual(url1, "http://example.com/page1")
+        assert url1 == "http://example.com/page1"
 
-        # Pop 1 from anothersite.org
         url2 = self.orchestrator._next_seed("anothersite.org")
-        self.assertEqual(url2, "http://anothersite.org/start")
+        assert url2 == "http://anothersite.org/start"
 
-        # Pop the last one from example.com
         url3 = self.orchestrator._next_seed("example.com")
-        self.assertEqual(url3, "http://example.com/page2")
+        assert url3 == "http://example.com/page2"
 
-        # Attempt to pop from an empty list
         url_none = self.orchestrator._next_seed("anothersite.org")
-        self.assertIsNone(url_none)
+        assert url_none is None
 
     @patch("src.data_pipeline.orchestrate.state_cache_file", new=Path("/mock/cache"))
     def test_setup_states_and_load_from_cache(self):
@@ -155,7 +133,6 @@ class TestOrchestratorUnit(unittest.TestCase):
         seed_urls = {
             "arkleg.state.ar.us/": ["https://arkleg.state.ar.us/",
                                     "https://arkleg.state.ar.us/Legislators/List"],
-            # "arkleg.state.ar.us/Legislators/List": ["https://arkleg.state.ar.us/Legislators/List"],
         }
         self.orchestrator.seed_urls = seed_urls
 
@@ -164,41 +141,32 @@ class TestOrchestratorUnit(unittest.TestCase):
         )
 
 
-        # Check states were created
-        self.assertIn("https://arkleg.state.ar.us/", self.orchestrator.state.nodes)
-        self.assertNotIn("https://arkleg.state.ar.us/Legislators/List", self.orchestrator.state.nodes)
+        assert "https://arkleg.state.ar.us/" in self.orchestrator.state.nodes
+        assert "https://arkleg.state.ar.us/Legislators/List" not in self.orchestrator.state.nodes
 
-        # Check loaded domain has a root (simulating successful load)
-        self.assertIsNotNone(self.orchestrator.state.roots)
+        assert self.orchestrator.state.roots is not None
 
-        # Check nodes_to_stack returns interleaved results from loaded domains
-        self.assertEqual(len(nodes_to_stack), 1)  # Only one mock node from loadeddomain
-        self.assertEqual(nodes_to_stack[0].url, "https://arkleg.state.ar.us/")
+        assert len(nodes_to_stack) == 1  # Only one mock node from loadeddomain
+        assert nodes_to_stack[0].url == "https://arkleg.state.ar.us/"
 
     @patch("src.data_pipeline.orchestrate.get_enum_by_url", return_value="MOCK_ENUM")
     @patch("src.data_pipeline.orchestrate.get_url_base_path", return_value="http://testdomain.com")
     def test_enqueue_links_string_url(self, mock_get_base_path, mock_get_enum):
         """Test enqueuing a single string URL as a new root node."""
 
-        # 1. Setup a state for the domain
-        domain = "testdomain.com"
 
         test_url = "http://testdomain.com/new"
 
         self.orchestrator._enqueue_links(test_url, self.crawler_queue)
 
-        # 1. Check the queue size
-        self.assertEqual(self.crawler_queue.qsize(), 1)
+        assert self.crawler_queue.qsize() == 1
 
-        # 2. Check the correct node was added to the queue
         mock_node = self.crawler_queue.get()
-        self.assertEqual(mock_node.url, test_url)
+        assert mock_node.url == test_url
 
-        # 3. Check the correct node was added to the visited list
-        self.assertIn(test_url, self.orchestrator.visited)
+        assert test_url in self.orchestrator.visited
 
-        # 4. Check the state was correctly set
-        self.assertEqual(mock_node.state, PipelineStateEnum.AWAITING_FETCH)
+        assert mock_node.state == PipelineStateEnum.AWAITING_FETCH
 
     def test_enqueue_links_list_of_nodes(self):
         """Test enqueuing a list of existing nodes."""
@@ -209,19 +177,16 @@ class TestOrchestratorUnit(unittest.TestCase):
 
         self.orchestrator._enqueue_links(enqueue_list, self.crawler_queue)
 
-        # 1. Check the queue size
-        self.assertEqual(self.crawler_queue.qsize(), 2)
+        assert self.crawler_queue.qsize() == 2
 
-        # 2. Check the nodes were added and state updated (LIFO order: 2 then 1)
         q_item1 = self.crawler_queue.get()
         q_item2 = self.crawler_queue.get()
 
-        self.assertEqual(q_item1, mock_node2)
-        self.assertEqual(q_item2, mock_node1)
+        assert q_item1 == mock_node2
+        assert q_item2 == mock_node1
 
-        # 3. Check visited list
-        self.assertIn("http://node1.com", self.orchestrator.visited)
-        self.assertIn("http://node2.com", self.orchestrator.visited)
+        assert "http://node1.com" in self.orchestrator.visited
+        assert "http://node2.com" in self.orchestrator.visited
 
     @patch("src.config.pipeline_enums.PipelineRegistries.FETCH.get_worker_class")
     @patch("src.config.pipeline_enums.PipelineRegistries.PROCESS.get_worker_class")
@@ -233,17 +198,15 @@ class TestOrchestratorUnit(unittest.TestCase):
         mock_processor_instance = MockProcessorWorker = MagicMock(name="MockProcessorWorker")
         mock_loader_instance = MockLoaderWorker = MagicMock(name="MockLoaderWorker")
 
-        # Patch the get_worker_class() to return a callable that returns the mock instance
         MockFetchWorkerCls.return_value = lambda *a, **kw: mock_crawler_instance
         MockProcessWorkerCls.return_value = lambda *a, **kw: mock_processor_instance
         MockLoadWorkerCls.return_value = lambda *a, **kw: mock_loader_instance
 
         w_crawler, w_processor, w_loader = self.orchestrator._setup_workers()
 
-        # Now you can assert the returned objects
-        self.assertIs(w_crawler, MockCrawlerWorker)
-        self.assertIs(w_processor, MockProcessorWorker)
-        self.assertIs(w_loader, MockLoaderWorker)
+        assert w_crawler is MockCrawlerWorker
+        assert w_processor is MockProcessorWorker
+        assert w_loader is MockLoaderWorker
 
     @patch("src.data_pipeline.orchestrate.BaseWorker")
     def test_start_workers(self, MockBaseWorker):
@@ -267,18 +230,13 @@ class TestOrchestratorUnit(unittest.TestCase):
 
         self.orchestrator.shutdown_workers([q1, q2], [worker1, worker2])
 
-        # Check None was added to queues
-        self.assertIsNone(q1.get_nowait())
-        self.assertIsNone(q2.get_nowait())
+        assert q1.get_nowait() is None
+        assert q2.get_nowait() is None
 
-        # Check workers were joined
         worker1.join.assert_called_once()
         worker2.join.assert_called_once()
 
 
-# ----------------------------------------------------------------------
-## 🧪 Integration Test (TestOrchestratorIntegration)
-# ----------------------------------------------------------------------
 class SyncMockWorker:
     def __init__(self, *args, **kwargs):
         self.input_queue = kwargs.get("input_queue")
@@ -304,10 +262,9 @@ class SyncMockWorker:
 
         self.processed_count += 1
 
-        # Only add node in the crawler stage
         if self.stage_label == "FETCH":
             url = getattr(item, "url", item)
-            site_key = urlparse(url).netloc.lower()
+            urlparse(url).netloc.lower()
             graph = self.state.setdefault(directed_graph.DirectionalGraph())
             graph.add_node(url=url, node_type="MOCK_NODE", parent=None)
 
@@ -332,94 +289,6 @@ class SyncMockLoaderWorker(SyncMockWorker):
         self.processed_count += 1
         self.input_queue.task_done()
         return True
-
-# ------------------------------
-# Integration test
-# ------------------------------
-# @patch("src.data_pipeline.orchestrate.load_json_list", return_value=[])
-# @patch("src.data_pipeline.orchestrate.get_enum_by_url", return_value="MOCK_ENUM")
-# @patch("src.data_pipeline.orchestrate.get_url_base_path", side_effect=lambda url: url)
-# @patch("src.data_pipeline.orchestrate.Orchestrator.orchestrate")
-# class TestOrchestratorSynchronousIntegration(unittest.TestCase):
-#
-#     @patch.object(PipelineRegistries.FETCH, "get_worker_class", new_callable=PropertyMock)
-#     @patch.object(PipelineRegistries.PROCESS, "get_worker_class", new_callable=PropertyMock)
-#     @patch.object(PipelineRegistries.LOAD, "get_worker_class", new_callable=PropertyMock)
-#     def test_full_orchestration_flow(
-#         self, mock_load_class, mock_process_class, mock_fetch_class,
-#         mock_orchestrate_method, mock_get_base_path, mock_get_enum, mock_load_json_list,
-#     ):
-#         # Assign synchronous mock workers
-#         mock_fetch_class.return_value = SyncMockWorker
-#         mock_process_class.return_value = SyncMockWorker
-#         mock_load_class.return_value = SyncMockLoaderWorker
-#
-#         # Seed URLs as a list
-#         seed_urls = ["https://arkleg.state.ar.us/", "https://www.geeksforgeeks.org/"
-#                      "https://arkleg.state.ar.us/Legislators/List"]
-#
-#         # Instantiate orchestrator with real DirectionalGraph
-#         orchestrator = Orchestrator(
-#             registry=MagicMock(),
-#             seed_urls=seed_urls,
-#             db_conn=MagicMock(),
-#             state=directed_graph.DirectionalGraph(),
-#             crawler=MagicMock(),
-#             parser=MagicMock(),
-#             transformer=MagicMock(),
-#             fetch_scheduler=MagicMock(),
-#         )
-#
-#         # Setup state and queues
-#         unvisited_nodes = orchestrator.setup_states(orchestrator.seed_urls, cache_base_path=Path("/mock/cache"))
-#         orchestrator._load_queues(unvisited_nodes)
-#         crawler_queue = orchestrator.queues[PipelineRegistries.FETCH]
-#         processor_queue = orchestrator.queues[PipelineRegistries.PROCESS]
-#         loader_queue = orchestrator.queues[PipelineRegistries.LOAD]
-#
-#         # Setup workers
-#         w_crawler, w_processor, w_loader = orchestrator._setup_workers()
-#
-#         # Process items manually
-#         expected_items = len(seed_urls)
-#         processed_total = 0
-#         MAX_CYCLES = 10
-#
-#         for _ in range(MAX_CYCLES):
-#             for w in [w_crawler, w_processor, w_loader]:
-#                 result = w.process_one_item()
-#                 if result is True:
-#                     processed_total += 1
-#             if processed_total >= expected_items * 3:
-#                 break
-#
-#         self.assertEqual(processed_total, expected_items * 3, f"Pipeline did not process all items (got {processed_total})")
-#
-#         # Shutdown workers
-#         orchestrator.shutdown_workers([crawler_queue, processor_queue, loader_queue],
-#                                       [w_crawler, w_processor, w_loader])
-#
-#         # Process sentinels
-#         for _ in range(6):
-#             for w in [w_crawler, w_processor, w_loader]:
-#                 w.process_one_item()
-#
-#         # Assert queues are empty
-#         self.assertTrue(crawler_queue.empty())
-#         self.assertTrue(processor_queue.empty())
-#         self.assertTrue(loader_queue.empty())
-#
-#         # Assert all workers processed all items
-#         self.assertEqual(w_crawler.processed_count, expected_items)
-#         self.assertEqual(w_processor.processed_count, expected_items)
-#         self.assertEqual(w_loader.processed_count, expected_items)
-#         # Assert graph has nodes
-#         for url in seed_urls:
-#             print(f"state is {orchestrator.state.nodes}")
-#             site_key = urlparse(url).netloc.lower()
-#             graph = orchestrator.state
-#             self.assertIsNotNone(graph.roots)
-#             self.assertEqual(len(graph.nodes), 2)
 
 
 import threading
@@ -470,13 +339,8 @@ class tMockDirectionalGraph:
             # IMPORTANT: Check if the node is in the roots set and remove it.
             if node_to_delete in self.roots:
                 self.roots.remove(node_to_delete)
-                print(
-                    f"GRAPH: Successfully removed root for {url}. Roots remaining: {len(self.roots)}",
-                )
                 return True
-            print(f"GRAPH WARNING: Node for {url} not found in roots set.")
             return False
-        print(f"GRAPH WARNING: Node for {url} not found in self.nodes.")
         return False
     # Mocking dict-like access for compatibility, if needed by Orchestrator
     def __setitem__(self, key, value):
@@ -484,22 +348,22 @@ class tMockDirectionalGraph:
     def __getitem__(self, key):
         return self # Return self if Orchestrator expects a Graph instance per key
 
-# Mock external functions/files
 known_links_cache_file = ""
 state_cache_file = Path("/mock/cache")
 load_json_list = MagicMock(return_value=[])
-get_url_base_path = lambda url: parse_url(url).host
-get_enum_by_url = lambda url: "MOCK_TYPE"
+def get_url_base_path(url):
+    return parse_url(url).host
+def get_enum_by_url(url):
+    return "MOCK_TYPE"
 db_conn_mock = MagicMock()
 
-# --- Mock Workers for Execution (Crucial for Threaded Testing) ---
 
 class ThreadedMockWorker(threading.Thread):
     """
     A minimal thread worker that processes items instantly.
     This simulates a single worker thread running concurrently.
     """
-    def __init__(self, input_queue: Queue, output_queue: Queue = None, state=None, **kwargs):
+    def __init__(self, input_queue: Queue, output_queue: Queue | None = None, state=None, **kwargs):
         super().__init__()
         self.input_queue = input_queue
         self.output_queue = output_queue
@@ -531,9 +395,6 @@ class ThreadedMockWorker(threading.Thread):
                 else:
                     # Final Worker (LOAD): Mark complete and remove root
                     item.state = PipelineStateEnum.COMPLETED
-                    print(
-                        f"LOAD WORKER FINISHED: Item {item.url} marked COMPLETED. Calling safe_delete_root...",
-                    )  # <--- ADD THIS
                     # --- CRITICAL FIX: ROOT DELETION ---
                     # This must be the actual Orchestrator's state/graph instance.
                     self.state.safe_remove_root(item.url)

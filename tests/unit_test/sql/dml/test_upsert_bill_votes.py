@@ -120,7 +120,7 @@ def loader(sql_file_path):
 class TestPipelineLoaderVoteEvent:
     def test_insert_all_vote_types(self, db, loader, sample_vote_data):
         vote_row = loader.execute(sample_vote_data, db)
-        vote_id = list(vote_row.values())[0]  # get the returned BIGINT
+        vote_id = next(iter(vote_row.values()))  # get the returned BIGINT
         assert vote_id is not None
 
         db.execute("SELECT COUNT(*) FROM legislator_votes WHERE fk_vote_event_id = %s", (vote_id,))
@@ -128,9 +128,9 @@ class TestPipelineLoaderVoteEvent:
 
     def test_idempotent_double_insert(self, db, loader, sample_vote_data):
         first_row = loader.execute(sample_vote_data, db)
-        first_id = list(first_row.values())[0]
+        first_id = next(iter(first_row.values()))
         second_row = loader.execute(sample_vote_data, db)
-        second_id = list(second_row.values())[0]
+        second_id = next(iter(second_row.values()))
         assert first_id == second_id
 
         db.execute("SELECT COUNT(*) FROM vote_events;")

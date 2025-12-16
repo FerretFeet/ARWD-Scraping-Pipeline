@@ -1,4 +1,5 @@
 from queue import LifoQueue, Queue
+from typing import Never
 from unittest import mock
 from unittest.mock import MagicMock
 from urllib.parse import urlparse
@@ -60,7 +61,7 @@ def fake_node():
         def __repr__(self):
             return "<Node 1>"
 
-        def set_state(self, state):
+        def set_state(self, state) -> None:
             self.state = state
     return Node()
 
@@ -161,7 +162,7 @@ class TestCrawlerWorker:
         assert fetch_q.qsize() == 2
 
     def test_process_success(self, worker, fake_node, lifoqueues):
-        fetch_q, process_q = lifoqueues
+        _fetch_q, process_q = lifoqueues
         domain = urlparse(fake_node.url).netloc
         worker.create_crawlers({fake_node})
         worker.crawlers[domain].get_page.return_value = "<html>"
@@ -206,7 +207,7 @@ class TestCrawlerWorker:
         worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
-        assert process_q.get() == None
+        assert process_q.get() is None
         assert process_q.qsize() == 0
 
     def test_error_in_parse_html(self, worker, fake_node, lifoqueues):
@@ -223,14 +224,13 @@ class TestCrawlerWorker:
         worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
-        assert process_q.get() == None
+        assert process_q.get() is None
         assert process_q.qsize() == 0
 
     def test_error_in_enqueue_links(self, worker, fake_node, lifoqueues):
         fetch_q, process_q = lifoqueues
         domain = urlparse(fake_node.url).netloc
         worker.create_crawlers({fake_node})
-        print(f"Worker crawler keys = {worker.crawlers.keys()}")
         worker.crawlers[domain].get_page.return_value = "<html>"
         worker.parser.get_content.return_value = {"links": ["A"]}
         worker.state.add_new_node.side_effect = Exception("tree failed")
@@ -242,7 +242,7 @@ class TestCrawlerWorker:
         worker.join()
 
         assert fake_node.state == PipelineStateEnum.ERROR
-        assert process_q.get() == None
+        assert process_q.get() is None
         assert process_q.qsize() == 0
 
 
@@ -393,7 +393,7 @@ class TestLoaderWorker:
         fake_db_conn.commit.assert_called_once()
 
     def test_process_raises_exception(self, loader_worker, fake_loader_obj, fake_db_conn):
-        def raise_error(params, db): raise Exception("DB error")
+        def raise_error(params, db) -> Never: raise Exception("DB error")
 
         fake_loader = MagicMock()
         fake_loader.execute.side_effect = Exception("DB error")
