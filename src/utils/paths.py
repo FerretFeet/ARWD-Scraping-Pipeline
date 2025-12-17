@@ -5,7 +5,7 @@ from pathlib import Path
 
 def find_project_root(start: Path) -> Path:
     """Return project root path."""
-    root_marker = ".venv"
+    root_marker = "src"
     for parent in [start, *start.parents]:
         if (parent / root_marker).exists():
             return parent

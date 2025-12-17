@@ -29,13 +29,13 @@ class PipelineRegistries(Enum):
 
     def __init__(self, label, queue_type, worker_path) -> None:
         """Initialize pipeline registry object"""
+
         self.label = label
         self.queue_type = queue_type
         self.worker_path = worker_path
 
     def __get_worker_class(self):
-        """Return pipeline stage class
-        """
+        """Return pipeline stage class."""
 
         module_name, cls_name = self.worker_path.rsplit(".", 1)
         module = importlib.import_module(module_name)

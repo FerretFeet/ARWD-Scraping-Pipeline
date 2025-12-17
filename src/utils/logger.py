@@ -13,9 +13,11 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
 
     logger.setLevel(logging.DEBUG)
 
+    log_folder = project_root / 'logs'
+
     # --- General log (INFO+) ---
     general_handler = RotatingFileHandler(
-        project_root / log_path,
+        log_folder / log_path,
         maxBytes=5 * 1024 * 1024,  # 5 MB
         backupCount=3,
     )
@@ -24,7 +26,7 @@ def setup_logger(log_path: str = "app.log") -> logging.Logger:
 
     # --- Warnings/errors log (WARNING+) ---
     warning_handler = RotatingFileHandler(
-        project_root / str("warnings_" + log_path),
+        log_folder / str("warnings_" + log_path),
         maxBytes=2 * 1024 * 1024,  # 2 MB
         backupCount=5,
     )
