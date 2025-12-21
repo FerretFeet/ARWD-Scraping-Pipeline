@@ -19,7 +19,14 @@ further analysis.
 
 ## Usage:
 
-TODO: Implement docker run automation
+**Requirements**: Python 3.13, Postgres, Linux
+
+1. Download the repository
+2. Run chmod +x \[project_root]/scripts/bootstrap_db.sh
+3. Run sudo \[project_root]/scripts/bootstrap.sh
+   - Note: requires sudo privelages to create databse users and modify pg_hba.
+4. From the project root, run python3 pip install -r requirements.txt
+5. Finally, run python3 -m ./src/main
 
 ## Tech Stack:
 - **Language**: Python 3.13.
@@ -28,7 +35,6 @@ TODO: Implement docker run automation
   - Development Libraries: Pytest, Ruff, Black, safety, pre-commit
 - **Database**: PostgresSQL
   - SCD-2 data storage
-- #TODO DOCKER
 
 
 ## Core Developed Solutions
