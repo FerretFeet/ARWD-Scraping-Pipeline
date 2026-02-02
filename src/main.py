@@ -78,11 +78,6 @@ class Main:
 
         self.shutdown()
 
-        # -- RUN --
-
-        # run()
-        # shutdown()
-
 
 if __name__ == '__main__':
     Main().main()
