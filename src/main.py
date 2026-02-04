@@ -46,7 +46,7 @@ class Main:
                 f"Cache file '{known_links_cache_file}' not found. Starting with all links.",
             )
 
-        starting_links = [link for link in self.starting_links if link not in self.known_links_set]
+        self.starting_links = [link for link in self.starting_links if link not in self.known_links_set]
 
     def run(self):
         with db_conn() as conn:
