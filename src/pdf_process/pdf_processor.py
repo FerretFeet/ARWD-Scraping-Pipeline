@@ -6,7 +6,7 @@ from utils.paths import project_root
 
 sideMargins = 90
 tbMargins = 80
-line_tolerance = 3
+line_tolerance = 2
 rect_height_max = 5
 
 class PdfProcessor:
@@ -36,6 +36,7 @@ class PdfProcessor:
                 for char in nPage.chars:
                     x0, x1 = char['x0'], char['x1']
                     top, bottom = char['top'], char['bottom']
+                    char_mid_y = (top + bottom) / 2
 
                     underline = False
                     strikethrough = False
@@ -43,9 +44,23 @@ class PdfProcessor:
                     for rect in nPage.rects:
                         height = rect['bottom'] - rect['top']
                         width_overlap = min(x1, rect['x1']) - max(x0, rect['x0'])
+
                         if width_overlap > 0 and height <= rect_height_max:
-                            if abs(rect['top'] - bottom) <= line_tolerance:
-                                underline = True
+                            rect_mid_y = (rect['top'] + rect['bottom']) / 2
+
+                            # Calculate distances to find the "closest" match
+                            dist_to_mid = abs(rect_mid_y - char_mid_y)
+                            dist_to_bottom = abs(rect['top'] - bottom)
+
+                            if dist_to_mid <= line_tolerance or dist_to_bottom <= line_tolerance:
+                                # Logic: Winner takes all
+                                if dist_to_mid < dist_to_bottom:
+                                    strikethrough = True
+                                    underline = False  # Explicitly disable the other
+                                else:
+                                    underline = True
+                                    strikethrough = False
+
 
                     if previous_bottom is not None and top > previous_bottom + 2:
                         print(self.flush_span(span_buffer, span_format), end='\n')
@@ -68,6 +83,7 @@ class PdfProcessor:
 
                 # Flush remaining buffer at end of page
                 print(self.flush_span(span_buffer, span_format), end='\n')
+
 
 
 
